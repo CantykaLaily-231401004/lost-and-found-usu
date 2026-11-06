@@ -1,15 +1,21 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../../services/supabase";
+import AuthLayout from "../../shared/components/AuthLayout";
+import TextField from "../../shared/components/TextField";
+import Button from "../../shared/components/Button";
 import { isCampusEmail, normalizeEmail } from "./emailDomain";
+
+type Errors = { name?: string; email?: string; password?: string };
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [sent, setSent] = useState(false);
+  const [errors, setErrors] = useState<Errors>({});
+  const [formError, setFormError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
   const [cooldown, setCooldown] = useState(0);
 
   function startCooldown() {
@@ -25,17 +31,19 @@ export default function RegisterPage() {
     }, 1000);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setError("");
+    setFormError("");
     const cleanEmail = normalizeEmail(email);
 
-    if (!name.trim()) return setError("Nama wajib diisi.");
+    const next: Errors = {};
+    if (!name.trim()) next.name = "Nama wajib diisi.";
     if (!isCampusEmail(cleanEmail))
-      return setError(
-        "Gunakan surel kampus (@students.usu.ac.id atau @usu.ac.id).",
-      );
-    if (password.length < 8) return setError("Kata sandi minimal 8 karakter.");
+      next.email =
+        "Gunakan surel kampus (@students.usu.ac.id atau @usu.ac.id).";
+    if (password.length < 8) next.password = "Kata sandi minimal 8 karakter.";
+    setErrors(next);
+    if (Object.keys(next).length > 0) return;
 
     setLoading(true);
     const { error } = await supabase.auth.signUp({
@@ -48,78 +56,117 @@ export default function RegisterPage() {
     });
     setLoading(false);
 
-    if (error) return setError("Pendaftaran gagal: " + error.message);
+    if (error) return setFormError("Pendaftaran gagal: " + error.message);
     setSent(true);
     startCooldown();
   }
 
   async function handleResend() {
-    setError("");
+    setFormError("");
     const { error } = await supabase.auth.resend({
       type: "signup",
       email: normalizeEmail(email),
     });
-    if (error) return setError("Gagal mengirim ulang: " + error.message);
+    if (error) return setFormError("Gagal mengirim ulang: " + error.message);
     startCooldown();
   }
 
   if (sent) {
     return (
-      <div className="mx-auto max-w-md p-6">
-        <h1 className="mb-2 text-2xl font-semibold">Cek surel kamu</h1>
-        <p className="mb-4 text-gray-600">
-          Tautan verifikasi dikirim ke {normalizeEmail(email)}. Berlaku 24 jam.
+      <AuthLayout>
+        <h2 className="font-display text-3xl font-semibold tracking-tight">
+          Cek surel Anda
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-gray-600">
+          Tautan verifikasi dikirim ke{" "}
+          <span className="font-medium text-gray-900">
+            {normalizeEmail(email)}
+          </span>
+          . Tautan berlaku 24 jam.
         </p>
-        {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
-        <button
-          onClick={handleResend}
-          disabled={cooldown > 0}
-          className="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
-        >
-          {cooldown > 0 ? `Kirim ulang (${cooldown}s)` : "Kirim ulang tautan"}
-        </button>
-      </div>
+        {formError && (
+          <p
+            role="alert"
+            className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+          >
+            {formError}
+          </p>
+        )}
+        <div className="mt-6 space-y-3">
+          <Button type="button" onClick={handleResend} disabled={cooldown > 0}>
+            {cooldown > 0
+              ? `Kirim ulang (${cooldown} dtk)`
+              : "Kirim ulang tautan"}
+          </Button>
+          <Link to="/login" className="block">
+            <Button type="button" variant="outline">
+              Ke halaman masuk
+            </Button>
+          </Link>
+        </div>
+      </AuthLayout>
     );
   }
 
   return (
-    <div className="mx-auto max-w-md p-6">
-      <h1 className="mb-4 text-2xl font-semibold">Registrasi</h1>
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <input
-          className="w-full rounded border p-2"
-          placeholder="Nama lengkap"
+    <AuthLayout>
+      <h2 className="font-display text-3xl font-semibold tracking-tight text-gray-900">
+        Buat akun baru
+      </h2>
+      <p className="mt-2 text-sm text-gray-500">
+        Daftar dengan surel kampus untuk mulai melapor dan mencari barang.
+      </p>
+
+      <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-5">
+        <TextField
+          label="Nama lengkap"
+          autoComplete="name"
+          placeholder="Nama sesuai identitas"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          error={errors.name}
         />
-        <input
-          className="w-full rounded border p-2"
+        <TextField
+          label="Alamat surel kampus"
           type="email"
-          placeholder="Surel kampus"
+          autoComplete="email"
+          placeholder="nama@students.usu.ac.id"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          error={errors.email}
         />
-        <input
-          className="w-full rounded border p-2"
+        <TextField
+          label="Kata sandi"
           type="password"
-          placeholder="Kata sandi"
+          autoComplete="new-password"
+          placeholder="Minimal 8 karakter"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          error={errors.password}
+          hint="Gunakan minimal 8 karakter."
         />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          disabled={loading}
-          className="w-full rounded bg-blue-600 p-2 text-white disabled:opacity-50"
-        >
+        {formError && (
+          <p
+            role="alert"
+            className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+          >
+            {formError}
+          </p>
+        )}
+        <Button type="submit" loading={loading}>
           {loading ? "Memproses..." : "Daftar"}
-        </button>
+        </Button>
       </form>
-      <p className="mt-4 text-sm">
+
+      <p className="mt-6 text-center text-sm text-gray-600">
         Sudah punya akun?{" "}
-        <Link to="/login" className="text-blue-600">
+        <Link
+          to="/login"
+          className="font-medium text-brand-800 hover:underline"
+        >
           Masuk
         </Link>
       </p>
-    </div>
+    </AuthLayout>
   );
 }
