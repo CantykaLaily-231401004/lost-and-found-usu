@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import LoginPage from "./features/auth/LoginPage";
+import RegisterPage from "./features/auth/RegisterPage";
 
 export default function App() {
   return (
@@ -8,8 +10,8 @@ export default function App() {
           path="/"
           element={<div className="p-6 text-xl">Lost and Found USU</div>}
         />
-        <Route path="/login" element={<div>Login</div>} />
-        <Route path="/register" element={<div>Registrasi</div>} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
       </Routes>
     </BrowserRouter>
   );
