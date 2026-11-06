@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
 import Icon, { type IconName } from "./Icon";
+import { useSessionUser } from "../hooks/useSessionUser";
 
-// Data dummy pengguna. Ganti dengan sesi Supabase saat siap.
-// unread = 0 sampai fitur notifikasi tersambung, supaya lencana tidak menampilkan angka palsu.
-const USER = { name: "Siti", verified: true, unread: 0 };
+// Jumlah notifikasi belum dibaca. Tetap 0 sampai fitur notifikasi tersambung,
+// supaya lencana tidak menampilkan angka palsu.
+const UNREAD = 0;
 
 const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: "/cari", label: "Cari Barang", icon: "search" },
@@ -15,20 +16,21 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: "/akun", label: "Akun", icon: "user" },
 ];
 
-function Avatar() {
+function Avatar({ name }: { name?: string }) {
   return (
     <span className="flex size-8 items-center justify-center rounded-full bg-tag text-sm font-bold text-brand-950">
-      {USER.name[0]}
+      {name ? name[0].toUpperCase() : ""}
     </span>
   );
 }
 
 export default function AppShell({ children }: { children: ReactNode }) {
+  const { user, ready } = useSessionUser();
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20">
         <div className="flex h-14 items-center justify-between bg-gradient-to-r from-brand-950 via-brand-800 to-brand-700 px-4 text-white sm:px-6">
-          <Link to="/" className="flex items-center gap-3">
+          <Link to={user ? "/beranda" : "/"} className="flex items-center gap-3">
             <span className="flex size-9 items-center justify-center rounded-lg bg-tag text-brand-950">
               <Icon name="search" className="size-5" />
             </span>
@@ -45,23 +47,36 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <Link
               to="/notifikasi"
               aria-label={
-                USER.unread > 0
-                  ? `Notifikasi, ${USER.unread} belum dibaca`
+                UNREAD > 0
+                  ? `Notifikasi, ${UNREAD} belum dibaca`
                   : "Notifikasi"
               }
               className="relative"
             >
               <Icon name="bell" className="size-6" />
-              {USER.unread > 0 && (
+              {UNREAD > 0 && (
                 <span className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-tag text-[10px] font-bold text-brand-950">
-                  {USER.unread}
+                  {UNREAD}
                 </span>
               )}
             </Link>
-            <span className="flex items-center gap-2 text-sm">
-              <Avatar />
-              <span className="hidden sm:inline">{USER.name}</span>
-            </span>
+            {user ? (
+              <span className="flex items-center gap-2 text-sm">
+                <Avatar name={user.name} />
+                <span className="hidden max-w-32 truncate sm:inline">
+                  {user.name}
+                </span>
+              </span>
+            ) : (
+              ready && (
+                <Link
+                  to="/login"
+                  className="rounded-full bg-white/15 px-3.5 py-1.5 text-sm font-medium hover:bg-white/25"
+                >
+                  Masuk
+                </Link>
+              )
+            )}
           </div>
         </div>
 
@@ -106,18 +121,24 @@ export default function AppShell({ children }: { children: ReactNode }) {
               </NavLink>
             ))}
           </nav>
-          <div className="flex items-center gap-3 rounded-xl bg-white p-3 shadow-sm">
-            <Avatar />
-            <div className="leading-tight">
-              <p className="text-sm font-medium text-gray-900">{USER.name}</p>
-              {USER.verified && (
-                <p className="flex items-center gap-1.5 text-xs text-gray-500">
-                  <span className="size-1.5 rounded-full bg-brand-700" />
-                  Terverifikasi
+          {user ? (
+            <div className="flex items-center gap-3 rounded-xl bg-white p-3 shadow-sm">
+              <Avatar name={user.name} />
+              <div className="min-w-0 leading-tight">
+                <p className="truncate text-sm font-medium text-gray-900">
+                  {user.name}
                 </p>
-              )}
+                <p className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <span
+                    className={`size-1.5 rounded-full ${user.verified ? "bg-brand-700" : "bg-gray-400"}`}
+                  />
+                  {user.verified ? "Terverifikasi" : "Belum terverifikasi"}
+                </p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <span />
+          )}
         </aside>
 
         <main className="min-w-0 flex-1 px-4 pb-28 pt-6 sm:px-8 lg:pb-12 lg:pt-8">

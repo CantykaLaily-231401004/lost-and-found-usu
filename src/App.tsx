@@ -4,6 +4,7 @@ import LoginPage from "./features/auth/LoginPage";
 import RegisterPage from "./features/auth/RegisterPage";
 import LostReportPage from "./features/lost-report/LostReportPage";
 import FoundReportPage from "./features/found-report/FoundReportPage";
+import BerandaPage from "./features/beranda/BerandaPage";
 import ComingSoon from "./shared/components/ComingSoon";
 
 export default function App() {
@@ -13,6 +14,7 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/beranda" element={<BerandaPage />} />
         <Route path="/lapor/kehilangan" element={<LostReportPage />} />
         <Route path="/lapor/temuan" element={<FoundReportPage />} />
         {/* Placeholder menu navbar. Ganti element-nya saat halaman asli jadi. */}
