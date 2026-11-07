@@ -2,10 +2,7 @@ import type { ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
 import Icon, { type IconName } from "./Icon";
 import { useSessionUser } from "../hooks/useSessionUser";
-
-// Jumlah notifikasi belum dibaca. Tetap 0 sampai fitur notifikasi tersambung,
-// supaya lencana tidak menampilkan angka palsu.
-const UNREAD = 0;
+import { useLofiStore } from "../store/lofiStore";
 
 const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: "/cari", label: "Cari Barang", icon: "search" },
@@ -24,13 +21,23 @@ function Avatar({ name }: { name?: string }) {
   );
 }
 
-export default function AppShell({ children }: { children: ReactNode }) {
+export default function AppShell({
+  children,
+  wide = false,
+}: {
+  children: ReactNode;
+  wide?: boolean;
+}) {
   const { user, ready } = useSessionUser();
+  const store = useLofiStore();
+  const unread = user
+    ? store.notifications.filter((n) => n.ownerId === user.id && !n.read).length
+    : 0;
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20">
         <div className="flex h-14 items-center justify-between bg-gradient-to-r from-brand-950 via-brand-800 to-brand-700 px-4 text-white sm:px-6">
-          <Link to={user ? "/beranda" : "/"} className="flex items-center gap-3">
+          <Link to={user ? "/cari" : "/"} className="flex items-center gap-3">
             <span className="flex size-9 items-center justify-center rounded-lg bg-tag text-brand-950">
               <Icon name="search" className="size-5" />
             </span>
@@ -47,16 +54,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <Link
               to="/notifikasi"
               aria-label={
-                UNREAD > 0
-                  ? `Notifikasi, ${UNREAD} belum dibaca`
+                unread > 0
+                  ? `Notifikasi, ${unread} belum dibaca`
                   : "Notifikasi"
               }
               className="relative"
             >
               <Icon name="bell" className="size-6" />
-              {UNREAD > 0 && (
+              {unread > 0 && (
                 <span className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-tag text-[10px] font-bold text-brand-950">
-                  {UNREAD}
+                  {unread}
                 </span>
               )}
             </Link>
@@ -142,7 +149,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </aside>
 
         <main className="min-w-0 flex-1 px-4 pb-28 pt-6 sm:px-8 lg:pb-12 lg:pt-8">
-          <div className="mx-auto w-full max-w-[42rem]">{children}</div>
+          <div
+            className={`mx-auto w-full ${wide ? "max-w-[64rem]" : "max-w-[42rem]"}`}
+          >
+            {children}
+          </div>
         </main>
       </div>
 

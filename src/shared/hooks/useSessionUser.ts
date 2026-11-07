@@ -2,12 +2,21 @@ import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../../services/supabase";
 
-export type SessionUser = { name: string; verified: boolean };
+export type SessionUser = {
+  id: string;
+  name: string;
+  email: string;
+  verified: boolean;
+  verifiedAt: string | null;
+};
 
 function toSessionUser(u: User | null | undefined): SessionUser | null {
   if (!u) return null;
   const meta = u.user_metadata?.name;
   return {
+    id: u.id,
+    email: u.email ?? "",
+    verifiedAt: u.email_confirmed_at ?? null,
     name:
       (typeof meta === "string" && meta.trim()) ||
       u.email?.split("@")[0] ||
