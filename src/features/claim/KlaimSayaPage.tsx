@@ -23,6 +23,7 @@ const TONE: Record<ClaimStatus, BadgeTone> = {
   Disetujui: "green",
   Ditolak: "redSoft",
   Dibatalkan: "graySoft",
+  Selesai: "soft",
 };
 
 export default function KlaimSayaPage() {

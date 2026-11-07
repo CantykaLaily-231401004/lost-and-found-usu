@@ -15,7 +15,13 @@ export type ReportStatus =
   | "Dicadangkan"
   | "Diserahkan"
   | "Ditutup";
-export type ClaimStatus = "Menunggu" | "Disetujui" | "Ditolak" | "Dibatalkan";
+export type ClaimStatus =
+  | "Menunggu"
+  | "Disetujui"
+  | "Ditolak"
+  | "Dibatalkan"
+  | "Selesai";
+export type ScheduleStatus = "Terjadwal" | "Dibatalkan" | "Selesai";
 export type NotifType = "Klaim" | "Jadwal" | "Laporan" | "Sistem";
 
 export type Report = {
@@ -58,6 +64,8 @@ export type Schedule = {
   place: string;
   note: string;
   officer: string;
+  /** Kosong dianggap Terjadwal (data lama). */
+  status?: ScheduleStatus;
 };
 
 export type Notif = {
@@ -314,4 +322,14 @@ export function hasActiveClaim(s: State, reportId: string) {
       c.reportId === reportId &&
       (c.status === "Menunggu" || c.status === "Disetujui"),
   );
+}
+
+/** Status efektif jadwal; data lama tanpa status dianggap Terjadwal. */
+export function scheduleStatus(sc: Schedule): ScheduleStatus {
+  return sc.status ?? "Terjadwal";
+}
+
+/** Semua jadwal milik user, termasuk riwayat (Selesai/Dibatalkan) sesuai SRS DR-01. */
+export function schedulesOf(s: State, ownerId: string) {
+  return s.schedules.filter((sc) => sc.ownerId === ownerId);
 }

@@ -5,7 +5,7 @@ import Button from "../../shared/components/Button";
 import Icon, { type IconName } from "../../shared/components/Icon";
 import PageBanner from "../../shared/components/PageBanner";
 import { useSessionUser } from "../../shared/hooks/useSessionUser";
-import { useLofiStore } from "../../shared/store/lofiStore";
+import { schedulesOf, useLofiStore } from "../../shared/store/lofiStore";
 import { supabase } from "../../services/supabase";
 import { formatDate } from "../../shared/utils/format";
 
@@ -33,7 +33,7 @@ export default function AkunPage() {
   const stats = [
     { n: store.reports.filter((r) => r.ownerId === id).length, label: "Laporan", cls: "bg-brand-700 text-white" },
     { n: store.claims.filter((c) => c.ownerId === id).length, label: "Klaim", cls: "bg-tag text-brand-950" },
-    { n: store.schedules.filter((s) => s.ownerId === id).length, label: "Jadwal", cls: "bg-brand-950 text-white" },
+    { n: schedulesOf(store, id ?? "").length, label: "Jadwal", cls: "bg-brand-950 text-white" },
   ];
 
   async function signOut() {
