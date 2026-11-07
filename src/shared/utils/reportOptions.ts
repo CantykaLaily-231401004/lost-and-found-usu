@@ -1,9 +1,10 @@
 // Data dummy. Ganti dengan data dari Supabase saat backend siap.
 export const CATEGORIES = [
   "Dompet & Tas",
-  "Kartu Identitas & Bank",
+  "Dokumen & Kartu",
   "Elektronik",
-  "Kunci & Kendaraan",
+  "Kunci",
+  "Kacamata",
   "Pakaian & Aksesoris",
   "Alat Tulis & Buku",
   "Botol & Wadah",

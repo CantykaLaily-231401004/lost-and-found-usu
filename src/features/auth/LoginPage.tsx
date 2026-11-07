@@ -33,7 +33,7 @@ export default function LoginPage() {
           : "Surel atau kata sandi salah.",
       );
     }
-    navigate("/beranda");
+    navigate("/cari");
   }
 
   return (

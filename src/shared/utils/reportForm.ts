@@ -1,5 +1,6 @@
 import { MAX_PHOTOS, type Photo } from "../components/PhotoUpload";
 import { OTHER_CATEGORY } from "./reportOptions";
+import type { Report, ReportInput } from "../store/lofiStore";
 
 export type ReportValues = {
   category: string;
@@ -95,4 +96,54 @@ export async function submitReportDummy(
     throw new Error("Layanan tidak merespons.");
   const n = Math.floor(Math.random() * 9000) + 1000;
   return { id: `${kind === "lost" ? "KEH" : "TEM"}-${n}` };
+}
+
+/** Isi form dari laporan yang sudah ada (mode ubah). */
+export function reportToValues(r: Report): ReportValues {
+  return {
+    category: r.category,
+    categoryOther: r.categoryOther,
+    description: r.description,
+    color: r.color,
+    brand: r.brand,
+    location: r.location,
+    area: r.area,
+    date: r.date,
+    time: r.time,
+    photos: r.photos.map((url) => ({ file: null, url })),
+  };
+}
+
+function readAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result));
+    fr.onerror = () => reject(fr.error);
+    fr.readAsDataURL(file);
+  });
+}
+
+/** Ubah isi form menjadi data laporan. Foto baru dibaca jadi data URL. */
+export async function valuesToInput(
+  kind: "lost" | "found",
+  v: ReportValues,
+  secrets: string[] = [],
+): Promise<ReportInput> {
+  const photos = await Promise.all(
+    v.photos.map((p) => (p.file ? readAsDataUrl(p.file) : p.url)),
+  );
+  return {
+    kind,
+    category: v.category,
+    categoryOther: v.categoryOther.trim(),
+    description: v.description.trim(),
+    color: v.color.trim(),
+    brand: v.brand.trim(),
+    location: v.location.trim(),
+    area: v.area,
+    date: v.date,
+    time: v.time,
+    secrets: secrets.map((x) => x.trim()).filter(Boolean),
+    photos,
+  };
 }

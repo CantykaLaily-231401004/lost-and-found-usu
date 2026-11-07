@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import AppShell from "../../shared/components/AppShell";
 import Alert from "../../shared/components/Alert";
 import Button from "../../shared/components/Button";
@@ -9,17 +9,27 @@ import {
   FormSection,
   PageHeader,
 } from "../../shared/components/FormCard";
+import EmptyState from "../../shared/components/EmptyState";
 import Icon from "../../shared/components/Icon";
 import ReportFields from "../../shared/components/ReportFields";
 import ReportSuccess from "../../shared/components/ReportSuccess";
 import Req from "../../shared/components/Req";
 import Stepper from "../../shared/components/Stepper";
 import TextField from "../../shared/components/TextField";
+import { useSessionUser } from "../../shared/hooks/useSessionUser";
+import {
+  addReport,
+  hasActiveClaim,
+  updateReport,
+  useLofiStore,
+} from "../../shared/store/lofiStore";
 import {
   emptyReport,
   focusFirstError,
+  reportToValues,
   submitReportDummy,
   validateReport,
+  valuesToInput,
   type ReportErrors,
   type ReportValues,
 } from "../../shared/utils/reportForm";
@@ -37,11 +47,39 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function FoundReportPage() {
+  const { id } = useParams();
+  const { user, ready } = useSessionUser();
+  if (!ready || !user) return null;
+  return <FoundReportForm key={id ?? "baru"} ownerId={user.id} editId={id} />;
+}
+
+function FoundReportForm({
+  ownerId,
+  editId,
+}: {
+  ownerId: string;
+  editId?: string;
+}) {
   const navigate = useNavigate();
+  const store = useLofiStore();
   const formRef = useRef<HTMLFormElement>(null);
+  const existing = editId
+    ? store.reports.find(
+        (r) =>
+          r.id === editId &&
+          r.kind === "found" &&
+          r.ownerId === ownerId &&
+          r.status === "Tersedia" &&
+          !hasActiveClaim(store, r.id),
+      )
+    : undefined;
   const [step, setStep] = useState(0);
-  const [values, setValues] = useState<ReportValues>(emptyReport);
-  const [secrets, setSecrets] = useState<string[]>(Array(SECRET_SLOTS).fill(""));
+  const [values, setValues] = useState<ReportValues>(() =>
+    existing ? reportToValues(existing) : emptyReport,
+  );
+  const [secrets, setSecrets] = useState<string[]>(() =>
+    Array.from({ length: SECRET_SLOTS }, (_, i) => existing?.secrets[i] ?? ""),
+  );
   const [errors, setErrors] = useState<ReportErrors>({});
   const [secretError, setSecretError] = useState("");
   const [formError, setFormError] = useState("");
@@ -84,8 +122,14 @@ export default function FoundReportPage() {
     setFormError("");
     setLoading(true);
     try {
-      const { id } = await submitReportDummy("found");
-      setDoneId(id);
+      await submitReportDummy("found");
+      const input = await valuesToInput("found", values, secrets);
+      if (existing) {
+        updateReport(existing.id, input);
+        setDoneId(existing.id);
+      } else {
+        setDoneId(addReport(input, ownerId).id);
+      }
     } catch {
       setFormError(
         "Laporan belum tersimpan dan belum diterbitkan. Periksa koneksi lalu coba lagi.",
@@ -108,15 +152,43 @@ export default function FoundReportPage() {
   const filledSecrets = secrets.map((s) => s.trim()).filter(Boolean);
   const when = values.date + (values.time ? `, ${values.time}` : "");
 
+  if (editId && !existing && !doneId) {
+    return (
+      <AppShell>
+        <EmptyState
+          icon="alert"
+          title="Laporan tidak dapat diubah"
+          body="Laporan hanya bisa diubah saat berstatus Tersedia dan belum ada klaim aktif. Jika perlu, hubungi admin."
+          action={
+            <Link to="/laporan-saya">
+              <Button type="button" className="w-auto!">
+                Ke Laporan Saya
+              </Button>
+            </Link>
+          }
+        />
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell>
       <PageHeader
-        title="Laporan Penemuan"
-        subtitle="Isi formulir berikut untuk melaporkan barang yang Anda temukan"
+        title={existing ? "Ubah Laporan Penemuan" : "Laporan Penemuan"}
+        subtitle={
+          existing
+            ? `Perbarui informasi laporan ${existing.id}`
+            : "Isi formulir berikut untuk melaporkan barang yang Anda temukan"
+        }
         onBack={() => navigate(-1)}
       />
       {doneId ? (
-        <ReportSuccess id={doneId} kind="found" onAgain={reset} />
+        <ReportSuccess
+          id={doneId}
+          kind="found"
+          mode={existing ? "edit" : "create"}
+          onAgain={reset}
+        />
       ) : (
         <>
           <div className="mb-6">
@@ -269,7 +341,11 @@ export default function FoundReportPage() {
                     loading={loading}
                     className="sm:w-auto!"
                   >
-                    {loading ? "Mengirim..." : "Kirim Laporan Temuan"}
+                    {loading
+                      ? "Mengirim..."
+                      : existing
+                        ? "Simpan Perubahan"
+                        : "Kirim Laporan Temuan"}
                   </Button>
                 )}
               </FormFooter>

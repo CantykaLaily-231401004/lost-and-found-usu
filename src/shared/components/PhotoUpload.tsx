@@ -8,7 +8,7 @@ import {
 import Button from "./Button";
 import Icon from "./Icon";
 
-export type Photo = { file: File; url: string };
+export type Photo = { file: File | null; url: string };
 
 export const MAX_PHOTOS = 3;
 export const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
@@ -32,7 +32,8 @@ export default function PhotoUpload({ photos, onChange, error }: Props) {
     latest.current = photos;
   });
   useEffect(
-    () => () => latest.current.forEach((p) => URL.revokeObjectURL(p.url)),
+    () => () =>
+      latest.current.forEach((p) => p.file && URL.revokeObjectURL(p.url)),
     [],
   );
 
@@ -79,7 +80,7 @@ export default function PhotoUpload({ photos, onChange, error }: Props) {
   }
 
   function remove(i: number) {
-    URL.revokeObjectURL(photos[i].url);
+    if (photos[i].file) URL.revokeObjectURL(photos[i].url);
     onChange(photos.filter((_, idx) => idx !== i));
     setLocalError("");
   }
@@ -134,7 +135,7 @@ export default function PhotoUpload({ photos, onChange, error }: Props) {
             >
               <img
                 src={p.url}
-                alt={`Foto ${i + 1}: ${p.file.name}`}
+                alt={`Foto ${i + 1}`}
                 className="size-full object-cover"
               />
               <button

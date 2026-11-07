@@ -1,11 +1,17 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./features/auth/LoginPage";
 import RegisterPage from "./features/auth/RegisterPage";
 import LostReportPage from "./features/lost-report/LostReportPage";
 import FoundReportPage from "./features/found-report/FoundReportPage";
-import BerandaPage from "./features/beranda/BerandaPage";
-import ComingSoon from "./shared/components/ComingSoon";
+import CariBarangPage from "./features/search/CariBarangPage";
+import LaporanSayaPage from "./features/my-reports/LaporanSayaPage";
+import AjukanKlaimPage from "./features/claim/AjukanKlaimPage";
+import KlaimSayaPage from "./features/claim/KlaimSayaPage";
+import JadwalPage from "./features/handover/JadwalPage";
+import NotifikasiPage from "./features/notification/NotifikasiPage";
+import AkunPage from "./features/account/AkunPage";
+import RequireAuth from "./shared/components/RequireAuth";
 
 export default function App() {
   return (
@@ -14,16 +20,22 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/beranda" element={<BerandaPage />} />
-        <Route path="/lapor/kehilangan" element={<LostReportPage />} />
-        <Route path="/lapor/temuan" element={<FoundReportPage />} />
-        {/* Placeholder menu navbar. Ganti element-nya saat halaman asli jadi. */}
-        <Route path="/cari" element={<ComingSoon title="Cari Barang" />} />
-        <Route path="/laporan-saya" element={<ComingSoon title="Laporan Saya" />} />
-        <Route path="/klaim-saya" element={<ComingSoon title="Klaim Saya" />} />
-        <Route path="/jadwal" element={<ComingSoon title="Jadwal" />} />
-        <Route path="/notifikasi" element={<ComingSoon title="Notifikasi" />} />
-        <Route path="/akun" element={<ComingSoon title="Akun" />} />
+
+        {/* Halaman aplikasi: hanya untuk pengguna yang sudah masuk. */}
+        <Route element={<RequireAuth />}>
+          <Route path="/cari" element={<CariBarangPage />} />
+          <Route path="/laporan-saya" element={<LaporanSayaPage />} />
+          <Route path="/klaim-saya" element={<KlaimSayaPage />} />
+          <Route path="/klaim/baru/:reportId" element={<AjukanKlaimPage />} />
+          <Route path="/jadwal" element={<JadwalPage />} />
+          <Route path="/notifikasi" element={<NotifikasiPage />} />
+          <Route path="/akun" element={<AkunPage />} />
+          <Route path="/lapor/kehilangan" element={<LostReportPage />} />
+          <Route path="/lapor/kehilangan/:id/ubah" element={<LostReportPage />} />
+          <Route path="/lapor/temuan" element={<FoundReportPage />} />
+          <Route path="/lapor/temuan/:id/ubah" element={<FoundReportPage />} />
+          <Route path="/beranda" element={<Navigate to="/cari" replace />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   );
