@@ -47,7 +47,8 @@ export default function LaporanSayaPage() {
     .filter((r) => r.ownerId === user?.id)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const shown = tab === "semua" ? mine : mine.filter((r) => r.kind === tab);
-  const count = (k: "lost" | "found") => mine.filter((r) => r.kind === k).length;
+  const count = (k: "lost" | "found") =>
+    mine.filter((r) => r.kind === k).length;
 
   function openClose(r: Report) {
     setClosing(r);
@@ -69,28 +70,39 @@ export default function LaporanSayaPage() {
     <AppShell wide>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-bold text-gray-900 sm:text-3xl">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-gray-900 sm:text-[1.75rem]">
             Laporan Saya
           </h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 text-[15px] text-gray-600">
             Semua laporan kehilangan dan penemuan yang Anda buat
           </p>
         </div>
         <div className="flex gap-2">
           <Link to="/lapor/kehilangan">
-            <Button type="button" variant="outline" className="h-10 w-auto! whitespace-nowrap px-3 text-sm sm:px-5">
-              <Icon name="plus" className="size-4" /> <span className="sm:hidden">Kehilangan</span><span className="hidden sm:inline">Lapor Kehilangan</span>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-9! w-auto! whitespace-nowrap px-4! text-[13px]! sm:px-5!"
+            >
+              <Icon name="plus" className="size-4" />{" "}
+              <span className="sm:hidden">Kehilangan</span>
+              <span className="hidden sm:inline">Lapor Kehilangan</span>
             </Button>
           </Link>
           <Link to="/lapor/temuan">
-            <Button type="button" className="h-10 w-auto! whitespace-nowrap px-3 text-sm sm:px-5">
-              <Icon name="plus" className="size-4" /> <span className="sm:hidden">Penemuan</span><span className="hidden sm:inline">Lapor Penemuan</span>
+            <Button
+              type="button"
+              className="h-9! w-auto! whitespace-nowrap px-4! text-[13px]! sm:px-5!"
+            >
+              <Icon name="plus" className="size-4" />{" "}
+              <span className="sm:hidden">Penemuan</span>
+              <span className="hidden sm:inline">Lapor Penemuan</span>
             </Button>
           </Link>
         </div>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-5">
         <Tabs
           label="Jenis laporan"
           value={tab}
@@ -103,7 +115,7 @@ export default function LaporanSayaPage() {
         />
       </div>
 
-      <div className="mt-5 space-y-4">
+      <div className="mt-4 grid gap-3 xl:grid-cols-2">
         {shown.length === 0 ? (
           <EmptyState
             icon="file"
@@ -128,23 +140,29 @@ export default function LaporanSayaPage() {
             return (
               <article
                 key={r.id}
-                className="flex gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
+                className={`flex gap-3 rounded-2xl border border-white/80 bg-white/90 p-3.5 shadow-sm transition hover:shadow-md ${
+                  open ? "" : "opacity-75"
+                }`}
               >
                 <ReportThumb
                   report={r}
-                  className="size-20 shrink-0 rounded-lg sm:size-24"
+                  className="size-16 shrink-0 rounded-lg sm:size-20"
                   iconClass="size-8"
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <ReportKindBadge kind={r.kind} />
                     <ReportStatusBadge status={r.status} />
-                    <span className="font-mono text-xs text-gray-500">{r.id}</span>
+                    <span className="font-mono text-xs text-gray-500">
+                      {r.id}
+                    </span>
                   </div>
-                  <h2 className="mt-2 text-[15px] font-medium leading-6 text-gray-900">
+                  <h2 className="mt-2 text-sm font-semibold leading-5 text-gray-900">
                     {r.description}
                   </h2>
-                  <p className="mt-0.5 text-sm text-gray-500">{categoryLabel(r)}</p>
+                  <p className="mt-0.5 text-sm text-gray-500">
+                    {categoryLabel(r)}
+                  </p>
                   <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
                     <span className="flex items-center gap-1.5">
                       <Icon name="pin" className="size-4" />
@@ -159,7 +177,8 @@ export default function LaporanSayaPage() {
                   {r.kind === "found" && r.secrets.length > 0 && (
                     <p className="mt-1 flex items-center gap-1.5 text-sm text-gray-500">
                       <Icon name="lock" className="size-4" />
-                      {r.secrets.length} ciri rahasia tersimpan, hanya terlihat oleh Anda dan admin.
+                      {r.secrets.length} ciri rahasia tersimpan, hanya terlihat
+                      oleh Anda dan admin.
                     </p>
                   )}
                   {r.closeReason && (
@@ -168,16 +187,20 @@ export default function LaporanSayaPage() {
                     </p>
                   )}
                   {open && !locked && (
-                    <div className="mt-3 flex items-center gap-3">
+                    <div className="mt-2.5 flex items-center gap-2">
                       <Link to={editPath}>
-                        <Button type="button" variant="outline" className="h-9 w-auto! text-sm">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-8! w-auto! rounded-full! px-4! text-[13px]!"
+                        >
                           Ubah
                         </Button>
                       </Link>
                       <button
                         type="button"
                         onClick={() => openClose(r)}
-                        className="h-9 rounded-lg px-2 text-sm text-gray-600 hover:text-red-600"
+                        className="h-8 rounded-full px-3 text-[13px] text-gray-600 transition hover:bg-red-50 hover:text-red-600"
                       >
                         Tutup Laporan
                       </button>
@@ -185,7 +208,8 @@ export default function LaporanSayaPage() {
                   )}
                   {open && locked && (
                     <p className="mt-3 text-sm text-gray-500">
-                      Ada klaim aktif. Perubahan dan penutupan hanya bisa lewat admin.
+                      Ada klaim aktif. Perubahan dan penutupan hanya bisa lewat
+                      admin.
                     </p>
                   )}
                 </div>

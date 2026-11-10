@@ -18,22 +18,27 @@ export default function ReportCard({
   /** Pengguna sudah punya klaim aktif pada laporan ini. */
   claimed: boolean;
 }) {
-  const claimable = report.kind === "found" && report.status === "Tersedia" && !mine;
+  const claimable =
+    report.kind === "found" && report.status === "Tersedia" && !mine;
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <div className="relative h-40">
-        <ReportThumb report={report} className="size-full" iconClass="size-14" />
+    <article className="flex flex-col overflow-hidden rounded-2xl border border-white/80 bg-white/90 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+      <div className="relative h-28">
+        <ReportThumb
+          report={report}
+          className="size-full"
+          iconClass="size-10"
+        />
         <div className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
-          <ReportKindBadge kind={report.kind} solid />
+          <ReportKindBadge kind={report.kind} />
           <ReportStatusBadge status={report.status} />
         </div>
         <span className="absolute bottom-3 left-3 max-w-[85%] truncate rounded-md bg-brand-950/75 px-2 py-0.5 text-xs text-white">
           {categoryLabel(report)}
         </span>
       </div>
-      <div className="flex flex-1 flex-col p-4">
-        <h3 className="line-clamp-2 min-h-[3rem] text-[15px] font-medium leading-6 text-gray-900">
+      <div className="flex flex-1 flex-col p-3.5">
+        <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-5 text-gray-900">
           {report.description}
         </h3>
         <p className="mt-2 flex items-center gap-1.5 text-sm text-gray-500">
@@ -44,7 +49,7 @@ export default function ReportCard({
           <Icon name="calendar" className="size-4 shrink-0" />
           {formatDate(report.date)}
         </p>
-        <div className="mt-auto pt-4">
+        <div className="mt-auto pt-3">
           {mine ? (
             <p className="text-center text-sm font-medium text-brand-800">
               Laporan Anda
@@ -52,7 +57,7 @@ export default function ReportCard({
           ) : claimable && claimed ? (
             <Link
               to="/klaim-saya"
-              className="flex h-10 items-center justify-center rounded-lg border border-brand-800 text-sm font-medium text-brand-800 hover:bg-brand-50"
+              className="flex h-9 items-center justify-center rounded-lg border border-brand-800 text-sm font-medium text-brand-800 hover:bg-brand-50"
             >
               Klaim sudah diajukan
             </Link>

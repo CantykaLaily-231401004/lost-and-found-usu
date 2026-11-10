@@ -20,6 +20,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+html {
+  font-size: 15px;
+}
+
 @keyframes swing {
   0% {
     transform: rotate(-7deg);
@@ -131,4 +135,49 @@ body {
     ),
     linear-gradient(160deg, #0f4029 0%, #0c3321 45%, #082418 100%),
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.06 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+.app-bg {
+  background-color: #0c3321;
+  background-image:
+    radial-gradient(
+      60rem 40rem at 85% -10%,
+      rgba(45, 122, 78, 0.55),
+      transparent 60%
+    ),
+    radial-gradient(
+      50rem 40rem at 0% 100%,
+      rgba(242, 181, 68, 0.1),
+      transparent 60%
+    ),
+    linear-gradient(160deg, #0f4029 0%, #0c3321 50%, #082418 100%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.11 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  background-attachment: fixed, fixed, fixed, scroll;
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(-48px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes slide-out {
+  from {
+    transform: none;
+    opacity: 1;
+  }
+  to {
+    transform: translateX(48px);
+    opacity: 0;
+  }
+}
+.slide-in {
+  animation: slide-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.slide-out {
+  animation: slide-out 0.6s cubic-bezier(0.5, 0, 0.8, 0.3) both;
 }

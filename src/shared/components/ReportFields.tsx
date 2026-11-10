@@ -28,7 +28,12 @@ type Props = {
 };
 
 /** Kolom bersama untuk form kehilangan dan form temuan (info publik). */
-export default function ReportFields({ kind, values, errors, onChange }: Props) {
+export default function ReportFields({
+  kind,
+  values,
+  errors,
+  onChange,
+}: Props) {
   const lost = kind === "lost";
   const set =
     (field: Exclude<keyof ReportValues, "photos">) =>
@@ -105,13 +110,13 @@ export default function ReportFields({ kind, values, errors, onChange }: Props) 
         onChange={set("location")}
         error={errors.location}
         hint={
-          lost
-            ? "Isi tempat terakhir barang diketahui masih ada."
-            : undefined
+          lost ? "Isi tempat terakhir barang diketahui masih ada." : undefined
         }
       />
       <Select
-        label={<Req>{lost ? "Fakultas / Gedung" : "Fakultas / Area Penanganan"}</Req>}
+        label={
+          <Req>{lost ? "Fakultas / Gedung" : "Fakultas / Area Penanganan"}</Req>
+        }
         placeholder={lost ? "Pilih fakultas/gedung" : "Pilih fakultas/area"}
         options={CAMPUS_AREAS}
         value={values.area}
@@ -149,9 +154,15 @@ export default function ReportFields({ kind, values, errors, onChange }: Props) 
   if (lost) {
     return (
       <>
-        <FormSection title="Informasi Barang">{item}</FormSection>
-        <FormSection title="Lokasi dan Waktu">{where}</FormSection>
-        <FormSection title="Foto (Opsional)">{photo}</FormSection>
+        <FormSection step={1} title="Informasi Barang">
+          {item}
+        </FormSection>
+        <FormSection step={2} title="Lokasi dan Waktu">
+          {where}
+        </FormSection>
+        <FormSection step={3} title="Foto (Opsional)">
+          {photo}
+        </FormSection>
       </>
     );
   }

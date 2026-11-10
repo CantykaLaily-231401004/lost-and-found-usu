@@ -4,7 +4,6 @@ import Badge, { type BadgeTone } from "../../shared/components/Badge";
 import Button from "../../shared/components/Button";
 import EmptyState from "../../shared/components/EmptyState";
 import Icon from "../../shared/components/Icon";
-import PageBanner from "../../shared/components/PageBanner";
 import { useSessionUser } from "../../shared/hooks/useSessionUser";
 import {
   scheduleStatus,
@@ -15,7 +14,20 @@ import {
 } from "../../shared/store/lofiStore";
 import { formatDateTimeWIB } from "../../shared/utils/format";
 
-const MONTHS = ["JAN", "FEB", "MAR", "APR", "MEI", "JUN", "JUL", "AGU", "SEP", "OKT", "NOV", "DES"];
+const MONTHS = [
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MEI",
+  "JUN",
+  "JUL",
+  "AGU",
+  "SEP",
+  "OKT",
+  "NOV",
+  "DES",
+];
 
 const TONE: Record<ScheduleStatus, BadgeTone> = {
   Terjadwal: "soft",
@@ -29,31 +41,41 @@ function ScheduleCard({ s }: { s: Schedule }) {
   const d = new Date(s.at);
   return (
     <article
-      className={`rounded-2xl bg-white p-5 ${active ? "border-2 border-brand-700" : "border border-gray-200"}`}
+      className={`rounded-2xl bg-white/90 p-4 shadow-sm transition hover:shadow-md ${
+        active
+          ? "border-2 border-brand-700"
+          : "border border-white/80 opacity-75"
+      }`}
     >
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <div
-          className={`flex size-14 shrink-0 flex-col items-center justify-center rounded-xl text-white ${active ? "bg-brand-800" : "bg-gray-400"}`}
+          className={`flex size-12 shrink-0 flex-col items-center justify-center rounded-xl text-white ${active ? "bg-brand-800" : "bg-gray-400"}`}
         >
-          <span className="text-xl font-bold leading-none">{d.getDate()}</span>
-          <span className="text-[10px] font-medium">{MONTHS[d.getMonth()]}</span>
+          <span className="text-lg font-bold leading-none">{d.getDate()}</span>
+          <span className="text-[10px] font-medium">
+            {MONTHS[d.getMonth()]}
+          </span>
         </div>
-        <div>
+        <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Badge tone={TONE[status]}>{status}</Badge>
             <span className="font-mono text-xs text-gray-500">{s.id}</span>
           </div>
-          <h3 className="mt-1 font-medium text-gray-900">{s.title}</h3>
+          <h3 className="mt-1 truncate text-sm font-semibold text-gray-900">
+            {s.title}
+          </h3>
         </div>
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-lg bg-surface px-4 py-3">
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div className="rounded-lg bg-surface px-3.5 py-2.5">
           <p className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-gray-500">
             <Icon name="clock" className="size-3.5" /> Waktu
           </p>
-          <p className="mt-1 text-sm font-medium text-gray-900">{formatDateTimeWIB(s.at)}</p>
+          <p className="mt-1 text-sm font-medium text-gray-900">
+            {formatDateTimeWIB(s.at)}
+          </p>
         </div>
-        <div className="rounded-lg bg-surface px-4 py-3">
+        <div className="rounded-lg bg-surface px-3.5 py-2.5">
           <p className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-gray-500">
             <Icon name="pin" className="size-3.5" /> Tempat
           </p>
@@ -61,15 +83,17 @@ function ScheduleCard({ s }: { s: Schedule }) {
         </div>
       </div>
       {s.note && (
-        <p className="mt-3 rounded-lg border border-brand-700/30 bg-brand-50 px-4 py-2.5 text-sm text-brand-950">
+        <p className="mt-3 rounded-lg border border-brand-700/30 bg-brand-50 px-3.5 py-2 text-sm text-brand-950">
           <strong>Catatan admin:</strong> {s.note}
         </p>
       )}
-      <p className="mt-3 text-sm text-gray-500">Penanggung jawab: {s.officer}</p>
+      <p className="mt-3 text-sm text-gray-500">
+        Penanggung jawab: {s.officer}
+      </p>
       {active && (
-        <p className="mt-3 text-xs text-gray-500">
-          Demi keamanan, bertemulah di lokasi kampus yang ramai, misalnya pos keamanan atau lobi
-          fakultas.
+        <p className="mt-2 text-xs text-gray-500">
+          Demi keamanan, bertemulah di lokasi kampus yang ramai, misalnya pos
+          keamanan atau lobi fakultas.
         </p>
       )}
     </article>
@@ -94,7 +118,9 @@ export default function JadwalPage() {
   const awaiting = myClaims.filter(
     (c) =>
       c.status === "Disetujui" &&
-      !store.schedules.some((s) => s.claimId === c.id && scheduleStatus(s) === "Terjadwal"),
+      !store.schedules.some(
+        (s) => s.claimId === c.id && scheduleStatus(s) === "Terjadwal",
+      ),
   ).length;
 
   const subtitle =
@@ -139,18 +165,14 @@ export default function JadwalPage() {
 
   return (
     <AppShell wide>
-      <PageBanner
-        eyebrow="Pantau jadwal"
-        title="Jadwal Serah Terima"
-        subtitle={subtitle}
-        aside={
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-white/15">
-            <Icon name="calendar" className="size-6" />
-          </span>
-        }
-      />
+      <div>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-gray-900 sm:text-[1.75rem]">
+          Jadwal Serah Terima
+        </h1>
+        <p className="mt-1 text-[15px] text-gray-600">{subtitle}</p>
+      </div>
 
-      <h2 className="mb-3 mt-8 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-600">
+      <h2 className="mb-3 mt-6 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-600">
         <span className="size-2 rounded-full bg-brand-700" />
         Jadwal mendatang
       </h2>
@@ -162,14 +184,18 @@ export default function JadwalPage() {
           body={empty.body}
           action={
             <Link to={empty.to}>
-              <Button type="button" variant="outline" className="w-auto!">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9! w-auto! px-4! text-[13px]!"
+              >
                 {empty.label}
               </Button>
             </Link>
           }
         />
       ) : (
-        <div className="space-y-4">
+        <div className="grid gap-3 xl:grid-cols-2">
           {upcoming.map((s) => (
             <ScheduleCard key={s.id} s={s} />
           ))}
@@ -178,11 +204,11 @@ export default function JadwalPage() {
 
       {history.length > 0 && (
         <>
-          <h2 className="mb-3 mt-8 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-600">
+          <h2 className="mb-3 mt-6 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-600">
             <span className="size-2 rounded-full bg-gray-400" />
             Riwayat
           </h2>
-          <div className="space-y-4">
+          <div className="grid gap-3 xl:grid-cols-2">
             {history.map((s) => (
               <ScheduleCard key={s.id} s={s} />
             ))}

@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import Icon, { type IconName } from "./Icon";
 import { useSessionUser } from "../hooks/useSessionUser";
 import { useLofiStore } from "../store/lofiStore";
+import { supabase } from "../../services/supabase";
 
 const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: "/cari", label: "Cari Barang", icon: "search" },
@@ -15,9 +16,30 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
 
 function Avatar({ name }: { name?: string }) {
   return (
-    <span className="flex size-8 items-center justify-center rounded-full bg-tag text-sm font-bold text-brand-950">
+    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-tag text-sm font-bold text-brand-950">
       {name ? name[0].toUpperCase() : ""}
     </span>
+  );
+}
+
+function QuickActions({ className = "" }: { className?: string }) {
+  return (
+    <div className={`gap-2 ${className}`}>
+      <Link
+        to="/lapor/kehilangan"
+        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-red-300/30 bg-red-400/15 px-3.5 text-sm font-medium text-red-100 transition hover:bg-red-400/25"
+      >
+        <Icon name="alert" className="size-4" />
+        Lapor Kehilangan
+      </Link>
+      <Link
+        to="/lapor/temuan"
+        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-tag/90 px-3.5 text-sm font-medium text-brand-950 transition hover:bg-tag"
+      >
+        <Icon name="checkCircle" className="size-4" />
+        Lapor Temuan
+      </Link>
+    </div>
   );
 }
 
@@ -28,57 +50,72 @@ export default function AppShell({
   children: ReactNode;
   wide?: boolean;
 }) {
+  const navigate = useNavigate();
   const { user, ready } = useSessionUser();
   const store = useLofiStore();
   const unread = user
     ? store.notifications.filter((n) => n.ownerId === user.id && !n.read).length
     : 0;
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    navigate("/", { replace: true });
+  }
+
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-20">
-        <div className="flex h-14 items-center justify-between bg-gradient-to-r from-brand-950 via-brand-800 to-brand-700 px-4 text-white sm:px-6">
-          <Link to={user ? "/cari" : "/"} className="flex items-center gap-3">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-tag text-brand-950">
-              <Icon name="search" className="size-5" />
+    <div className="app-bg flex h-dvh flex-col overflow-hidden">
+      <header className="shrink-0 px-4 pt-3 text-white sm:px-6">
+        <div className="flex h-12 items-center justify-between gap-3">
+          <Link to={user ? "/cari" : "/"} className="flex items-center gap-2.5">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-tag text-brand-950">
+              <Icon name="search" className="size-4" />
             </span>
             <span className="leading-tight">
               <span className="block font-display text-base font-bold">
                 LoFi USU
               </span>
-              <span className="hidden text-[11px] text-white/70 sm:block">
+              <span className="hidden text-[11px] text-white/60 sm:block">
                 Universitas Sumatera Utara
               </span>
             </span>
           </Link>
-          <div className="flex items-center gap-4">
+
+          <div className="flex items-center gap-1">
             <Link
               to="/notifikasi"
               aria-label={
-                unread > 0
-                  ? `Notifikasi, ${unread} belum dibaca`
-                  : "Notifikasi"
+                unread > 0 ? `Notifikasi, ${unread} belum dibaca` : "Notifikasi"
               }
-              className="relative"
+              title="Notifikasi"
+              className="relative rounded-full p-2.5 text-white/85 transition hover:bg-white/10 hover:text-white"
             >
               <Icon name="bell" className="size-6" />
               {unread > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-tag text-[10px] font-bold text-brand-950">
+                <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-tag text-[10px] font-bold text-brand-950">
                   {unread}
                 </span>
               )}
             </Link>
             {user ? (
-              <span className="flex items-center gap-2 text-sm">
-                <Avatar name={user.name} />
-                <span className="hidden max-w-32 truncate sm:inline">
-                  {user.name}
-                </span>
-              </span>
+              <>
+                <button
+                  type="button"
+                  onClick={signOut}
+                  aria-label="Keluar"
+                  title="Keluar"
+                  className="rounded-full p-2.5 text-white/85 transition hover:bg-white/10 hover:text-white"
+                >
+                  <Icon name="logout" className="size-6" />
+                </button>
+                <Link to="/akun" aria-label="Akun" className="ml-1 lg:hidden">
+                  <Avatar name={user.name} />
+                </Link>
+              </>
             ) : (
               ready && (
                 <Link
                   to="/login"
-                  className="rounded-full bg-white/15 px-3.5 py-1.5 text-sm font-medium hover:bg-white/25"
+                  className="rounded-full bg-tag px-4 py-1.5 text-sm font-medium text-brand-950 hover:brightness-95"
                 >
                   Masuk
                 </Link>
@@ -86,80 +123,68 @@ export default function AppShell({
             )}
           </div>
         </div>
-
-        <div className="flex h-12 items-center gap-2 overflow-x-auto bg-brand-950 px-4 sm:gap-3 sm:px-6">
-          <span className="hidden shrink-0 text-xs text-white/60 sm:inline">
-            Laporan cepat:
-          </span>
-          <Link
-            to="/lapor/kehilangan"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-red-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-red-500"
-          >
-            <Icon name="alert" className="size-3.5" />
-            Lapor Kehilangan
-          </Link>
-          <Link
-            to="/lapor/temuan"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-tag px-3.5 py-1.5 text-xs font-semibold text-brand-950 hover:brightness-95"
-          >
-            <Icon name="checkCircle" className="size-3.5" />
-            Lapor Temuan
-          </Link>
-        </div>
+        <QuickActions className="flex items-center justify-center pt-2 lg:hidden" />
       </header>
 
-      <div className="flex flex-1">
-        <aside className="sticky top-[6.5rem] hidden h-[calc(100vh-6.5rem)] w-60 shrink-0 flex-col justify-between p-3 lg:flex">
-          <nav className="space-y-1 rounded-xl bg-white p-2 shadow-sm">
+      <div className="flex min-h-0 flex-1 gap-4 pt-3 lg:px-4">
+        <aside className="hidden w-48 shrink-0 flex-col justify-between pb-4 lg:flex">
+          <nav className="space-y-1 rounded-2xl border border-white/10 bg-white/[0.06] p-2 backdrop-blur-sm">
             {NAV.map((n) => (
               <NavLink
                 key={n.to}
                 to={n.to}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
+                  `flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition ${
                     isActive
-                      ? "bg-brand-800 font-medium text-white"
-                      : "text-gray-700 hover:bg-brand-50"
+                      ? "bg-white/15 font-medium text-white ring-1 ring-inset ring-white/20"
+                      : "text-white/70 hover:bg-white/10 hover:text-white"
                   }`
                 }
               >
-                <Icon name={n.icon} className="size-5" />
+                <Icon name={n.icon} className="size-[18px]" />
                 {n.label}
               </NavLink>
             ))}
           </nav>
-          {user ? (
-            <div className="flex items-center gap-3 rounded-xl bg-white p-3 shadow-sm">
-              <Avatar name={user.name} />
-              <div className="min-w-0 leading-tight">
-                <p className="truncate text-sm font-medium text-gray-900">
-                  {user.name}
-                </p>
-                <p className="flex items-center gap-1.5 text-xs text-gray-500">
-                  <span
-                    className={`size-1.5 rounded-full ${user.verified ? "bg-brand-700" : "bg-gray-400"}`}
-                  />
-                  {user.verified ? "Terverifikasi" : "Belum terverifikasi"}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <span />
-          )}
+
+          <div className="space-y-3">
+            <QuickActions className="flex flex-col" />
+            {user && (
+              <Link
+                to="/akun"
+                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3 text-white backdrop-blur-sm hover:bg-white/10"
+              >
+                <Avatar name={user.name} />
+                <span className="min-w-0 leading-tight">
+                  <span className="block truncate text-sm font-medium">
+                    {user.name}
+                  </span>
+                  <span className="mt-0.5 flex items-center gap-1.5 text-xs text-white/60">
+                    <span
+                      className={`size-1.5 rounded-full ${user.verified ? "bg-emerald-400" : "bg-white/40"}`}
+                    />
+                    {user.verified ? "Terverifikasi" : "Belum terverifikasi"}
+                  </span>
+                </span>
+              </Link>
+            )}
+          </div>
         </aside>
 
-        <main className="min-w-0 flex-1 px-4 pb-28 pt-6 sm:px-8 lg:pb-12 lg:pt-8">
-          <div
-            className={`mx-auto w-full ${wide ? "max-w-[64rem]" : "max-w-[42rem]"}`}
-          >
-            {children}
+        <main className="min-w-0 flex-1 lg:pb-4">
+          <div className="paper h-full overflow-y-auto rounded-t-3xl px-4 pb-24 pt-5 text-gray-900 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.5)] sm:px-8 lg:rounded-3xl lg:pb-8 lg:pt-6">
+            <div
+              className={`mx-auto w-full ${wide ? "max-w-[62rem]" : "max-w-[42rem]"}`}
+            >
+              {children}
+            </div>
           </div>
         </main>
       </div>
 
       <nav
         aria-label="Navigasi utama"
-        className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-6 border-t border-gray-200 bg-white lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-6 border-t border-gray-200 bg-white/95 backdrop-blur lg:hidden"
       >
         {NAV.map((n) => (
           <NavLink

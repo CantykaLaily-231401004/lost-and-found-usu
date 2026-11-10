@@ -42,21 +42,24 @@ export default function KlaimSayaPage() {
     <AppShell wide>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-bold text-gray-900 sm:text-3xl">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-gray-900 sm:text-[1.75rem]">
             Klaim Saya
           </h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 text-[15px] text-gray-600">
             Daftar pengajuan klaim barang temuan
           </p>
         </div>
         <Link to="/cari">
-          <Button type="button" className="h-10 w-auto! text-sm">
+          <Button
+            type="button"
+            className="h-9! w-auto! px-4! text-[13px]! sm:px-5!"
+          >
             <Icon name="plus" className="size-4" /> Klaim Baru
           </Button>
         </Link>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-5">
         <Tabs
           label="Status klaim"
           value={tab}
@@ -70,32 +73,44 @@ export default function KlaimSayaPage() {
         />
       </div>
 
-      <div className="mt-5 space-y-4">
+      <div className="mt-4 grid gap-3 xl:grid-cols-2">
         {shown.length === 0 ? (
-          <EmptyState
-            icon="clipboard"
-            title="Belum ada klaim"
-            body="Temukan barang Anda di Cari Barang, lalu ajukan klaim dengan bukti kepemilikan."
-            action={
-              <Link to="/cari">
-                <Button type="button" className="w-auto!">
-                  Cari Barang
-                </Button>
-              </Link>
-            }
-          />
+          <div className="xl:col-span-2">
+            <EmptyState
+              icon="clipboard"
+              title="Belum ada klaim"
+              body="Temukan barang Anda di Cari Barang, lalu ajukan klaim dengan bukti kepemilikan."
+              action={
+                <Link to="/cari">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9! w-auto! px-4! text-[13px]!"
+                  >
+                    Cari Barang
+                  </Button>
+                </Link>
+              }
+            />
+          </div>
         ) : (
           shown.map((c) => {
             const report = store.reports.find((r) => r.id === c.reportId);
             return (
               <article
                 key={c.id}
-                className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+                className={`rounded-2xl border border-white/80 bg-white/90 p-4 shadow-sm transition hover:shadow-md ${
+                  c.status === "Ditolak" || c.status === "Dibatalkan"
+                    ? "opacity-75"
+                    : ""
+                }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge tone={TONE[c.status]}>{c.status}</Badge>
-                    <span className="font-mono text-xs text-gray-500">{c.id}</span>
+                    <span className="font-mono text-xs text-gray-500">
+                      {c.id}
+                    </span>
                   </div>
                   {c.status === "Menunggu" && (
                     <button
@@ -107,7 +122,7 @@ export default function KlaimSayaPage() {
                     </button>
                   )}
                 </div>
-                <h2 className="mt-2 text-[15px] font-medium text-gray-900">
+                <h2 className="mt-2 text-sm font-semibold leading-5 text-gray-900">
                   {report
                     ? `${shorten(report.description, 70)} — ${report.location}`
                     : c.reportId}
@@ -115,17 +130,19 @@ export default function KlaimSayaPage() {
                 <p className="mt-0.5 text-sm text-gray-500">
                   Diajukan: {formatDateTime(c.createdAt)}
                 </p>
-                <div className="mt-3 rounded-lg bg-surface px-4 py-3">
+                <div className="mt-3 rounded-lg bg-surface px-3.5 py-2.5">
                   <p className="text-sm font-medium text-gray-900">
                     Bukti yang diajukan:
                   </p>
-                  <p className="mt-1 text-sm leading-6 text-gray-700">{c.evidence}</p>
+                  <p className="mt-1 text-sm leading-6 text-gray-700">
+                    {c.evidence}
+                  </p>
                 </div>
                 {c.status === "Disetujui" && (
-                  <p className="mt-3 rounded-lg border border-brand-700/30 bg-brand-50 px-4 py-3 text-sm text-brand-950">
-                    Klaim disetujui. Jadwal serah terima akan dibuat oleh admin dan
-                    muncul di menu Jadwal. Klaim yang sudah disetujui tidak bisa
-                    dibatalkan langsung; hubungi admin.
+                  <p className="mt-3 rounded-lg border border-brand-700/30 bg-brand-50 px-3.5 py-2.5 text-sm text-brand-950">
+                    Klaim disetujui. Jadwal serah terima akan dibuat oleh admin
+                    dan muncul di menu Jadwal. Klaim yang sudah disetujui tidak
+                    bisa dibatalkan langsung; hubungi admin.
                   </p>
                 )}
               </article>

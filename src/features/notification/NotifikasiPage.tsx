@@ -3,7 +3,6 @@ import AppShell from "../../shared/components/AppShell";
 import Badge from "../../shared/components/Badge";
 import EmptyState from "../../shared/components/EmptyState";
 import Icon, { type IconName } from "../../shared/components/Icon";
-import PageBanner from "../../shared/components/PageBanner";
 import Tabs from "../../shared/components/Tabs";
 import { useSessionUser } from "../../shared/hooks/useSessionUser";
 import {
@@ -22,6 +21,7 @@ const ICON: Record<NotifType, IconName> = {
   Jadwal: "calendar",
   Sistem: "info",
 };
+
 const TYPES: NotifType[] = ["Klaim", "Jadwal", "Laporan", "Sistem"];
 
 export default function NotifikasiPage() {
@@ -33,25 +33,33 @@ export default function NotifikasiPage() {
     .filter((n) => n.ownerId === user?.id)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const unread = mine.filter((n) => !n.read).length;
-  const unreadOf = (t: NotifType) => mine.filter((n) => n.type === t && !n.read).length;
+  const unreadOf = (t: NotifType) =>
+    mine.filter((n) => n.type === t && !n.read).length;
   const shown = tab === "semua" ? mine : mine.filter((n) => n.type === tab);
 
   return (
     <AppShell wide>
-      <PageBanner
-        eyebrow="Pusat pesan"
-        title="Notifikasi"
-        subtitle={unread > 0 ? `${unread} belum dibaca` : "Semua sudah dibaca"}
-        aside={
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-white/15">
-            <Icon name="bell" className="size-6" />
-          </span>
-        }
-      />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-gray-900 sm:text-[1.75rem]">
+            Notifikasi
+          </h1>
+          <p className="mt-1 text-[15px] text-gray-600">
+            {unread > 0 ? `${unread} belum dibaca` : "Semua sudah dibaca"}
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={unread === 0}
+          onClick={() => user && markAllRead(user.id)}
+          className="rounded-full border border-brand-800/25 bg-white/70 px-4 py-1.5 text-[13px] font-medium text-brand-800 transition hover:bg-white disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400"
+        >
+          Baca semua
+        </button>
+      </div>
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mt-5">
         <Tabs
-          variant="pill"
           label="Jenis notifikasi"
           value={tab}
           onChange={setTab}
@@ -60,17 +68,9 @@ export default function NotifikasiPage() {
             ...TYPES.map((t) => ({ value: t, label: t, count: unreadOf(t) })),
           ]}
         />
-        <button
-          type="button"
-          disabled={unread === 0}
-          onClick={() => user && markAllRead(user.id)}
-          className="text-sm font-medium text-brand-800 hover:underline disabled:text-gray-400 disabled:no-underline"
-        >
-          Baca semua
-        </button>
       </div>
 
-      <div className="mt-4 space-y-3">
+      <div className="mt-4 space-y-2.5">
         {shown.length === 0 ? (
           <EmptyState
             icon="bell"
@@ -83,14 +83,14 @@ export default function NotifikasiPage() {
               key={n.id}
               type="button"
               onClick={() => !n.read && markRead(n.id)}
-              className={`flex w-full gap-4 rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
+              className={`flex w-full gap-3 rounded-2xl bg-white/90 p-3.5 text-left shadow-sm transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
                 n.read
-                  ? "border-gray-200"
-                  : "border-gray-200 border-l-4 border-l-brand-700"
+                  ? "border border-white/80 opacity-75"
+                  : "border border-white/80 border-l-4 border-l-brand-700"
               }`}
             >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-surface text-brand-800">
-                <Icon name={ICON[n.type]} className="size-5" />
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface text-brand-800">
+                <Icon name={ICON[n.type]} className="size-[18px]" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center justify-between gap-3">
@@ -108,11 +108,11 @@ export default function NotifikasiPage() {
                   </span>
                 </span>
                 <span
-                  className={`mt-1 block text-[15px] text-gray-900 ${n.read ? "" : "font-semibold"}`}
+                  className={`mt-1 block text-sm text-gray-900 ${n.read ? "font-medium" : "font-semibold"}`}
                 >
                   {n.title}
                 </span>
-                <span className="mt-0.5 block text-sm leading-6 text-gray-600">
+                <span className="mt-0.5 block text-[13px] leading-5 text-gray-600">
                   {n.body}
                 </span>
               </span>

@@ -14,7 +14,7 @@ export default function PageBanner({
   children?: ReactNode;
 }) {
   return (
-    <section className="panel-green overflow-hidden rounded-2xl px-5 py-6 text-white sm:px-7 sm:py-7">
+    <section className="panel-green relative overflow-hidden rounded-3xl px-5 py-5 text-white shadow-[0_20px_50px_-20px_rgba(12,51,33,0.5)] sm:px-6 sm:py-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           {eyebrow && (
@@ -22,7 +22,7 @@ export default function PageBanner({
               {eyebrow}
             </p>
           )}
-          <h1 className="mt-1 font-display text-2xl font-bold sm:text-3xl">
+          <h1 className="mt-1 font-display text-xl font-bold sm:text-2xl">
             {title}
           </h1>
           {subtitle && <p className="mt-1 text-sm text-white/75">{subtitle}</p>}
