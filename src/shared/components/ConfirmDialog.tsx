@@ -33,18 +33,28 @@ export default function ConfirmDialog({
         aria-labelledby="dlg-title"
         className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
       >
-        <h2 id="dlg-title" className="font-display text-xl font-semibold text-gray-900">
+        <h2
+          id="dlg-title"
+          className="font-display text-xl font-semibold text-gray-900"
+        >
           {title}
         </h2>
         <div className="mt-3 space-y-4 text-sm text-gray-600">{children}</div>
-        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" onClick={onCancel} className="sm:w-auto!">
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            className="h-9! rounded-full! px-5! text-[13px]! sm:w-auto!"
+          >
             Batal
           </Button>
           <Button
             type="button"
             onClick={onConfirm}
-            className={`sm:w-auto! ${danger ? "bg-red-600! hover:bg-red-500!" : ""}`}
+            className={`h-9! rounded-full! px-5! text-[13px]! sm:w-auto! ${
+              danger ? "bg-red-600! hover:bg-red-500!" : ""
+            }`}
           >
             {confirmLabel}
           </Button>
