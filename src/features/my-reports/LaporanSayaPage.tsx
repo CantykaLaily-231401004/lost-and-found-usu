@@ -117,18 +117,24 @@ export default function LaporanSayaPage() {
 
       <div className="mt-4 grid gap-3 xl:grid-cols-2">
         {shown.length === 0 ? (
-          <EmptyState
-            icon="file"
-            title="Belum ada laporan"
-            body="Laporan yang Anda buat akan muncul di sini, lengkap dengan statusnya."
-            action={
-              <Link to="/lapor/kehilangan">
-                <Button type="button" className="w-auto!">
-                  Buat laporan pertama
-                </Button>
-              </Link>
-            }
-          />
+          <div className="xl:col-span-2">
+            <EmptyState
+              icon="file"
+              title="Belum ada laporan"
+              body="Laporan yang Anda buat akan muncul di sini, lengkap dengan statusnya."
+              action={
+                <Link to="/lapor/kehilangan">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9! w-auto! px-4! text-[13px]!"
+                  >
+                    Buat laporan pertama
+                  </Button>
+                </Link>
+              }
+            />
+          </div>
         ) : (
           shown.map((r) => {
             const open = isOpen(r);
