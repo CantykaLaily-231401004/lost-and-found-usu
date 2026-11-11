@@ -27,6 +27,11 @@ export default function LoginPage() {
     setLoading(false);
 
     if (error) {
+      if (error.status === 429) {
+        return setError(
+          "Terlalu banyak percobaan masuk. Coba lagi dalam beberapa menit.",
+        );
+      }
       return setError(
         error.message.toLowerCase().includes("not confirmed")
           ? "Surel belum diverifikasi. Cek kotak masuk Anda."

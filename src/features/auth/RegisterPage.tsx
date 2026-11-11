@@ -72,7 +72,13 @@ export default function RegisterPage() {
     });
     setLoading(false);
 
-    if (error) return setFormError("Pendaftaran gagal: " + error.message);
+    if (error) {
+      return setFormError(
+        error.status === 429
+          ? "Terlalu banyak permintaan. Tunggu sebentar lalu coba lagi."
+          : "Pendaftaran gagal. Coba lagi beberapa saat lagi.",
+      );
+    }
     if (data.user && data.user.identities && data.user.identities.length === 0) {
       return setFormError("Surel ini sudah terdaftar. Silakan masuk.");
     }
@@ -91,7 +97,13 @@ export default function RegisterPage() {
       email: normalizeEmail(email),
     });
     resendLock.current = false;
-    if (error) setFormError("Gagal mengirim ulang: " + error.message);
+    if (error) {
+      setFormError(
+        error.status === 429
+          ? "Tunggu sebentar sebelum meminta surel baru."
+          : "Gagal mengirim ulang. Coba lagi beberapa saat lagi.",
+      );
+    }
   }
 
   if (sent) {
