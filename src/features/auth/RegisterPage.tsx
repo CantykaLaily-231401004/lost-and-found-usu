@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../services/supabase";
 import AuthLayout from "../../shared/components/AuthLayout";
 import TextField from "../../shared/components/TextField";
@@ -9,6 +9,7 @@ import { isCampusEmail, normalizeEmail } from "./emailDomain";
 type Errors = { name?: string; email?: string; password?: string };
 
 export default function RegisterPage() {
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,6 +18,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const resendLock = useRef(false);
 
   function startCooldown() {
     setCooldown(60);
@@ -30,6 +33,19 @@ export default function RegisterPage() {
       });
     }, 1000);
   }
+
+  useEffect(() => {
+    if (!pendingUserId) return;
+    const channel = supabase
+      .channel(`signup:${pendingUserId}`)
+      .on("broadcast", { event: "email_confirmed" }, () => {
+        navigate("/login", { replace: true });
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [pendingUserId, navigate]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -46,7 +62,7 @@ export default function RegisterPage() {
     if (Object.keys(next).length > 0) return;
 
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: cleanEmail,
       password,
       options: {
@@ -57,18 +73,25 @@ export default function RegisterPage() {
     setLoading(false);
 
     if (error) return setFormError("Pendaftaran gagal: " + error.message);
+    if (data.user && data.user.identities && data.user.identities.length === 0) {
+      return setFormError("Surel ini sudah terdaftar. Silakan masuk.");
+    }
+    if (data.user) setPendingUserId(data.user.id);
     setSent(true);
     startCooldown();
   }
 
   async function handleResend() {
+    if (resendLock.current || cooldown > 0) return;
+    resendLock.current = true;
     setFormError("");
+    startCooldown();
     const { error } = await supabase.auth.resend({
       type: "signup",
       email: normalizeEmail(email),
     });
-    if (error) return setFormError("Gagal mengirim ulang: " + error.message);
-    startCooldown();
+    resendLock.current = false;
+    if (error) setFormError("Gagal mengirim ulang: " + error.message);
   }
 
   if (sent) {
