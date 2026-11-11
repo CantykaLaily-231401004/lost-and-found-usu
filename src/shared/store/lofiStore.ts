@@ -53,6 +53,9 @@ export type Claim = {
   evidence: string;
   status: ClaimStatus;
   createdAt: string;
+  decisionReason?: string;
+  decidedAt?: string;
+  matchedSecrets?: number[];
 };
 
 export type Schedule = {
@@ -66,6 +69,7 @@ export type Schedule = {
   officer: string;
   /** Kosong dianggap Terjadwal (data lama). */
   status?: ScheduleStatus;
+  cancelReason?: string;
 };
 
 export type Notif = {
@@ -241,7 +245,10 @@ export function addClaim(reportId: string, evidence: string, ownerId: string) {
   const report = state.reports.find((r) => r.id === reportId);
   if (!report) return null;
   const claim: Claim = {
-    id: nextId("KLM", state.claims.map((c) => c.id)),
+    id: nextId(
+      "KLM",
+      state.claims.map((c) => c.id),
+    ),
     ownerId,
     reportId,
     evidence: evidence.trim(),
@@ -332,4 +339,188 @@ export function scheduleStatus(sc: Schedule): ScheduleStatus {
 /** Semua jadwal milik user, termasuk riwayat (Selesai/Dibatalkan) sesuai SRS DR-01. */
 export function schedulesOf(s: State, ownerId: string) {
   return s.schedules.filter((sc) => sc.ownerId === ownerId);
+}
+
+/* ---------- tindakan admin (dummy) ---------- */
+
+/** Setujui klaim: wajib menandai minimal satu ciri rahasia yang cocok. */
+export function approveClaim(id: string, matched: number[]) {
+  const claim = state.claims.find((c) => c.id === id);
+  if (!claim || claim.status !== "Menunggu" || matched.length < 1) return false;
+  const report = state.reports.find((r) => r.id === claim.reportId);
+  commit({
+    ...state,
+    claims: state.claims.map((c) =>
+      c.id === id
+        ? {
+            ...c,
+            status: "Disetujui",
+            matchedSecrets: matched,
+            decidedAt: new Date().toISOString(),
+          }
+        : c,
+    ),
+    reports: state.reports.map((r) =>
+      r.id === claim.reportId ? { ...r, status: "Dicadangkan" } : r,
+    ),
+    notifications: [
+      makeNotif(
+        claim.ownerId,
+        "Klaim",
+        "Klaim Disetujui",
+        `Klaim ${id} untuk "${shorten(report?.description ?? claim.reportId)}" disetujui. Admin akan menetapkan jadwal serah terima.`,
+      ),
+      ...state.notifications,
+    ],
+  });
+  return true;
+}
+
+export function rejectClaim(id: string, reason: string) {
+  const claim = state.claims.find((c) => c.id === id);
+  if (!claim || claim.status !== "Menunggu" || reason.trim().length < 3)
+    return false;
+  commit({
+    ...state,
+    claims: state.claims.map((c) =>
+      c.id === id
+        ? {
+            ...c,
+            status: "Ditolak",
+            decisionReason: reason.trim(),
+            decidedAt: new Date().toISOString(),
+          }
+        : c,
+    ),
+    notifications: [
+      makeNotif(
+        claim.ownerId,
+        "Klaim",
+        "Klaim Ditolak",
+        `Klaim ${id} ditolak. Alasan: ${reason.trim()}`,
+      ),
+      ...state.notifications,
+    ],
+  });
+  return true;
+}
+
+/** Buat jadwal serah terima. Mengembalikan pesan error, atau null jika berhasil. */
+export function createSchedule(
+  claimId: string,
+  input: { at: string; place: string; officer: string; note: string },
+): string | null {
+  const claim = state.claims.find((c) => c.id === claimId);
+  if (!claim || claim.status !== "Disetujui") return "Klaim belum disetujui.";
+  if (
+    state.schedules.some(
+      (s) => s.claimId === claimId && scheduleStatus(s) === "Terjadwal",
+    )
+  )
+    return "Klaim ini sudah punya jadwal aktif.";
+  const at = new Date(input.at);
+  if (Number.isNaN(at.getTime())) return "Waktu tidak valid.";
+  if (at.getTime() <= Date.now())
+    return "Waktu serah terima harus di masa depan.";
+  if (input.place.trim().length < 3) return "Isi tempat serah terima.";
+  if (input.officer.trim().length < 3) return "Isi nama penanggung jawab.";
+  const report = state.reports.find((r) => r.id === claim.reportId);
+  const schedule: Schedule = {
+    id: nextId(
+      "JDW",
+      state.schedules.map((s) => s.id),
+    ),
+    ownerId: claim.ownerId,
+    claimId,
+    title: shorten(report?.description ?? claim.reportId, 60),
+    at: at.toISOString(),
+    place: input.place.trim(),
+    note: input.note.trim(),
+    officer: input.officer.trim(),
+    status: "Terjadwal",
+  };
+  commit({
+    ...state,
+    schedules: [schedule, ...state.schedules],
+    notifications: [
+      makeNotif(
+        claim.ownerId,
+        "Jadwal",
+        "Jadwal Serah Terima Dibuat",
+        `Serah terima "${schedule.title}" dijadwalkan di ${schedule.place}. Cek menu Jadwal untuk detailnya.`,
+      ),
+      ...state.notifications,
+    ],
+  });
+  return null;
+}
+
+/** Batalkan jadwal (wajib alasan). Klaim tetap Disetujui, temuan tetap Dicadangkan. */
+export function cancelSchedule(id: string, reason: string) {
+  const sc = state.schedules.find((s) => s.id === id);
+  if (!sc || scheduleStatus(sc) !== "Terjadwal" || reason.trim().length < 3)
+    return false;
+  commit({
+    ...state,
+    schedules: state.schedules.map((s) =>
+      s.id === id
+        ? { ...s, status: "Dibatalkan", cancelReason: reason.trim() }
+        : s,
+    ),
+    notifications: [
+      makeNotif(
+        sc.ownerId,
+        "Jadwal",
+        "Jadwal Dibatalkan",
+        `Jadwal ${id} dibatalkan. Alasan: ${reason.trim()}. Admin akan menetapkan jadwal pengganti.`,
+      ),
+      ...state.notifications,
+    ],
+  });
+  return true;
+}
+
+/** Selesaikan serah terima: perlu konfirmasi pemilik DAN penyerah. */
+export function completeHandover(
+  scheduleId: string,
+  ownerConfirmed: boolean,
+  giverConfirmed: boolean,
+) {
+  if (!ownerConfirmed || !giverConfirmed) return false;
+  const sc = state.schedules.find((s) => s.id === scheduleId);
+  if (!sc || scheduleStatus(sc) !== "Terjadwal") return false;
+  const claim = state.claims.find((c) => c.id === sc.claimId);
+  const report = claim && state.reports.find((r) => r.id === claim.reportId);
+  commit({
+    ...state,
+    schedules: state.schedules.map((s) =>
+      s.id === scheduleId ? { ...s, status: "Selesai" } : s,
+    ),
+    claims: state.claims.map((c) =>
+      c.id === sc.claimId ? { ...c, status: "Selesai" } : c,
+    ),
+    reports: state.reports.map((r) =>
+      claim && r.id === claim.reportId ? { ...r, status: "Diserahkan" } : r,
+    ),
+    notifications: [
+      makeNotif(
+        sc.ownerId,
+        "Jadwal",
+        "Serah Terima Selesai",
+        `Serah terima "${sc.title}" telah selesai. Terima kasih.`,
+      ),
+      ...(report
+        ? [
+            makeNotif(
+              report.ownerId,
+              "Laporan",
+              "Barang Temuan Diserahkan",
+              `Barang pada laporan ${report.id} telah diserahkan kepada pemiliknya. Terima kasih sudah membantu.`,
+            ),
+          ]
+        : []),
+      ...state.notifications,
+    ],
+  });
+  return true;
 }

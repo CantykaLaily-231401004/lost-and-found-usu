@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import Icon, { type IconName } from "./Icon";
 import { useSessionUser } from "../hooks/useSessionUser";
+import { useIsAdmin } from "../hooks/useIsAdmin";
 import { useLofiStore } from "../store/lofiStore";
 import { supabase } from "../../services/supabase";
 
@@ -53,6 +54,10 @@ export default function AppShell({
   const navigate = useNavigate();
   const { user, ready } = useSessionUser();
   const store = useLofiStore();
+  const isAdmin = useIsAdmin();
+  const items = isAdmin
+    ? [...NAV, { to: "/admin", label: "Admin", icon: "lock" as IconName }]
+    : NAV;
   const unread = user
     ? store.notifications.filter((n) => n.ownerId === user.id && !n.read).length
     : 0;
@@ -129,7 +134,7 @@ export default function AppShell({
       <div className="flex min-h-0 flex-1 gap-4 pt-3 lg:px-4">
         <aside className="hidden w-48 shrink-0 flex-col justify-between pb-4 lg:flex">
           <nav className="space-y-1 rounded-2xl border border-white/10 bg-white/[0.06] p-2 backdrop-blur-sm">
-            {NAV.map((n) => (
+            {items.map((n) => (
               <NavLink
                 key={n.to}
                 to={n.to}
@@ -184,9 +189,12 @@ export default function AppShell({
 
       <nav
         aria-label="Navigasi utama"
-        className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-6 border-t border-gray-200 bg-white/95 backdrop-blur lg:hidden"
+        style={{
+          gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`,
+        }}
+        className="fixed inset-x-0 bottom-0 z-20 grid border-t border-gray-200 bg-white/95 backdrop-blur lg:hidden"
       >
-        {NAV.map((n) => (
+        {items.map((n) => (
           <NavLink
             key={n.to}
             to={n.to}
