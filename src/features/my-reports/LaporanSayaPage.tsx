@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import AppShell from "../../shared/components/AppShell";
 import Button from "../../shared/components/Button";
@@ -21,6 +21,12 @@ import {
   type Report,
 } from "../../shared/store/lofiStore";
 import { formatDate, formatDateTime } from "../../shared/utils/format";
+import { closeLostReport, listMyLostReports } from "../../services/lostReports";
+import { errorMessage } from "../../services/rpc";
+
+/** Batas alasan penutupan, sama dengan rpc_close_lost_report. */
+const MIN_REASON = 10;
+const MAX_REASON = 300;
 
 type Tab = "semua" | "lost" | "found";
 
@@ -42,10 +48,37 @@ export default function LaporanSayaPage() {
   const [reason, setReason] = useState("");
   const [other, setOther] = useState("");
   const [reasonError, setReasonError] = useState("");
+  const [closingBusy, setClosingBusy] = useState(false);
 
-  const mine = store.reports
-    .filter((r) => r.ownerId === user?.id)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  // Laporan kehilangan dari database; laporan temuan masih dari data dummy sampai Session 4.
+  const [lostReports, setLostReports] = useState<Report[]>([]);
+  const [lostState, setLostState] = useState<"loading" | "ready" | "error">("loading");
+
+  const [reloadKey, setReloadKey] = useState(0);
+  const userId = user?.id;
+
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    listMyLostReports(userId)
+      .then((list) => {
+        if (!active) return;
+        setLostReports(list);
+        setLostState("ready");
+      })
+      .catch(() => active && setLostState("error"));
+    return () => {
+      active = false;
+    };
+  }, [userId, reloadKey]);
+
+  /** Muat ulang daftar laporan kehilangan dari database. */
+  const loadLost = useCallback(() => setReloadKey((k) => k + 1), []);
+
+  const mine = [
+    ...lostReports,
+    ...store.reports.filter((r) => r.kind === "found" && r.ownerId === user?.id),
+  ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const shown = tab === "semua" ? mine : mine.filter((r) => r.kind === tab);
   const count = (k: "lost" | "found") =>
     mine.filter((r) => r.kind === k).length;
@@ -57,13 +90,27 @@ export default function LaporanSayaPage() {
     setReasonError("");
   }
 
-  function confirmClose() {
-    if (!closing) return;
+  async function confirmClose() {
+    if (!closing || closingBusy) return;
     if (!reason) return setReasonError("Pilih alasan penutupan.");
-    if (reason === "Alasan lain" && other.trim().length < 3)
-      return setReasonError("Jelaskan alasan Anda (minimal 3 karakter).");
-    closeReport(closing.id, reason === "Alasan lain" ? other.trim() : reason);
-    setClosing(null);
+    if (reason === "Alasan lain" && other.trim().length < MIN_REASON)
+      return setReasonError(`Jelaskan alasan Anda (minimal ${MIN_REASON} karakter).`);
+    const text = reason === "Alasan lain" ? other.trim() : reason;
+    if (closing.kind === "found") {
+      closeReport(closing.id, text);
+      setClosing(null);
+      return;
+    }
+    setClosingBusy(true);
+    try {
+      await closeLostReport(closing.id, text);
+      setClosing(null);
+      loadLost();
+    } catch (err) {
+      setReasonError(errorMessage(err));
+    } finally {
+      setClosingBusy(false);
+    }
   }
 
   return (
@@ -115,8 +162,19 @@ export default function LaporanSayaPage() {
         />
       </div>
 
+      {lostState === "error" && (
+        <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+          Laporan kehilangan gagal dimuat.{" "}
+          <button type="button" onClick={loadLost} className="font-medium underline">
+            Coba lagi
+          </button>
+        </p>
+      )}
+
       <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        {shown.length === 0 ? (
+        {lostState === "loading" ? (
+          <p className="text-sm text-gray-500 xl:col-span-2">Memuat laporan...</p>
+        ) : shown.length === 0 ? (
           <div className="xl:col-span-2">
             <EmptyState
               icon="file"
@@ -160,7 +218,7 @@ export default function LaporanSayaPage() {
                     <ReportKindBadge kind={r.kind} />
                     <ReportStatusBadge status={r.status} />
                     <span className="font-mono text-xs text-gray-500">
-                      {r.id}
+                      {r.kode ?? r.id}
                     </span>
                   </div>
                   <h2 className="mt-2 text-sm font-semibold leading-5 text-gray-900">
@@ -177,6 +235,7 @@ export default function LaporanSayaPage() {
                     <span className="flex items-center gap-1.5">
                       <Icon name="calendar" className="size-4" />
                       {formatDate(r.date)}
+                      {r.time && `, ${r.time.replace(":", ".")} WIB`}
                     </span>
                     <span>Dibuat: {formatDateTime(r.createdAt)}</span>
                   </p>
@@ -230,12 +289,12 @@ export default function LaporanSayaPage() {
           title="Tutup laporan?"
           confirmLabel="Tutup Laporan"
           danger
-          onConfirm={confirmClose}
+          onConfirm={() => void confirmClose()}
           onCancel={() => setClosing(null)}
         >
           <p>
-            Laporan {closing.id} tidak bisa diubah lagi setelah ditutup. Riwayat
-            tetap tersimpan.
+            Laporan {closing.kode ?? closing.id} tidak bisa diubah lagi setelah
+            ditutup. Riwayat tetap tersimpan.
           </p>
           <Select
             label="Alasan penutupan"
@@ -251,6 +310,8 @@ export default function LaporanSayaPage() {
           {reason === "Alasan lain" && (
             <TextField
               label="Jelaskan alasan"
+              maxLength={MAX_REASON}
+              hint={`${other.trim().length}/${MAX_REASON} karakter, minimal ${MIN_REASON}`}
               value={other}
               onChange={(e) => {
                 setOther(e.target.value);

@@ -11,6 +11,11 @@ import {
   OTHER_CATEGORY,
 } from "../utils/reportOptions";
 import {
+  MAX_BRAND,
+  MAX_CATEGORY_OTHER,
+  MAX_COLOR,
+  MAX_DESCRIPTION,
+  MAX_LOCATION,
   MIN_DESCRIPTION,
   todayISO,
   type ReportErrors,
@@ -25,6 +30,7 @@ type Props = {
     field: K,
     value: ReportValues[K],
   ) => void;
+  areaOptions?: readonly { value: string; label: string }[];
 };
 
 /** Kolom bersama untuk form kehilangan dan form temuan (info publik). */
@@ -33,6 +39,7 @@ export default function ReportFields({
   values,
   errors,
   onChange,
+  areaOptions,
 }: Props) {
   const lost = kind === "lost";
   const set =
@@ -57,7 +64,7 @@ export default function ReportFields({
         <TextField
           label={<Req>Jenis barang</Req>}
           placeholder="Cth: Payung, Kacamata, Helm..."
-          maxLength={50}
+          maxLength={MAX_CATEGORY_OTHER}
           value={values.categoryOther}
           onChange={set("categoryOther")}
           error={errors.categoryOther}
@@ -76,6 +83,7 @@ export default function ReportFields({
             : "Contoh: Dompet kulit warna hitam, ditemukan di dekat pintu masuk Perpustakaan..."
         }
         minChars={MIN_DESCRIPTION}
+        maxLength={MAX_DESCRIPTION}
         value={values.description}
         onChange={set("description")}
         error={errors.description}
@@ -84,14 +92,18 @@ export default function ReportFields({
         <TextField
           label="Warna"
           placeholder={lost ? "Cth: Hitam, Merah..." : "Cth: Hitam..."}
+          maxLength={MAX_COLOR}
           value={values.color}
           onChange={set("color")}
+          error={errors.color}
         />
         <TextField
           label="Merek"
           placeholder={lost ? "Cth: Eiger, Fossil..." : "Cth: Fossil..."}
+          maxLength={MAX_BRAND}
           value={values.brand}
           onChange={set("brand")}
+          error={errors.brand}
         />
       </div>
     </>
@@ -106,6 +118,7 @@ export default function ReportFields({
             ? "Cth: Ruang kuliah FT 301, Parkiran FMIPA..."
             : "Lokasi spesifik tempat barang ditemukan"
         }
+        maxLength={MAX_LOCATION}
         value={values.location}
         onChange={set("location")}
         error={errors.location}
@@ -115,10 +128,10 @@ export default function ReportFields({
       />
       <Select
         label={
-          <Req>{lost ? "Fakultas / Gedung" : "Fakultas / Area Penanganan"}</Req>
+          <Req>{lost ? "Area Kampus" : "Fakultas / Area Penanganan"}</Req>
         }
-        placeholder={lost ? "Pilih fakultas/gedung" : "Pilih fakultas/area"}
-        options={CAMPUS_AREAS}
+        placeholder={lost ? "Pilih area kampus" : "Pilih fakultas/area"}
+        options={areaOptions ?? CAMPUS_AREAS}
         value={values.area}
         onChange={set("area")}
         error={errors.area}

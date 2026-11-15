@@ -109,10 +109,22 @@ type ReportRowBase = AreaJoin & {
   created_at: string;
 };
 
-export type LostReportRow = ReportRowBase & {
+export type LostReportRow = AreaJoin & {
   lost_id: string;
+  kode: string;
+  user_id: string;
+  area_id: string;
+  kategori: string;
+  kategori_lainnya: string | null;
+  deskripsi: string;
+  warna: string | null;
+  merek: string | null;
   lokasi_kehilangan: string;
   tanggal_kehilangan: string;
+  jam_kehilangan: string | null;
+  status: DbReportStatus;
+  created_at: string;
+  photos?: { photo_id: string; storage_path: string }[];
 };
 
 export type FoundReportRow = ReportRowBase & {
@@ -137,13 +149,31 @@ function reportBase(row: ReportRowBase, when: string) {
   };
 }
 
-/** Baris lost_reports (boleh dengan join `areas(nama_area)`) -> Report. */
-export function lostRowToReport(row: LostReportRow): Report {
+export function lostRowToReport(
+  row: LostReportRow,
+  photoUrl: (path: string) => string = () => "",
+): Report {
+  const photos = row.photos ?? [];
   return {
-    ...reportBase(row, row.tanggal_kehilangan),
     id: row.lost_id,
+    kode: row.kode,
     kind: "lost",
+    ownerId: row.user_id,
+    category: row.kategori,
+    categoryOther: row.kategori_lainnya ?? "",
+    description: row.deskripsi,
+    color: row.warna ?? "",
+    brand: row.merek ?? "",
     location: row.lokasi_kehilangan,
+    area: row.areas?.nama_area ?? "",
+    areaId: row.area_id,
+    date: row.tanggal_kehilangan,
+    time: row.jam_kehilangan?.slice(0, 5) ?? "",
+    secrets: [],
+    status: reportStatusFromDb(row.status),
+    createdAt: row.created_at,
+    photos: photos.map((p) => photoUrl(p.storage_path)),
+    photoIds: photos.map((p) => p.photo_id),
   };
 }
 

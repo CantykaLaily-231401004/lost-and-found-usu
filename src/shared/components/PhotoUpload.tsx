@@ -8,11 +8,21 @@ import {
 import Button from "./Button";
 import Icon from "./Icon";
 
-export type Photo = { file: File | null; url: string };
+export type Photo = { file: File | null; url: string; id?: string; path?: string };
 
 export const MAX_PHOTOS = 3;
 export const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
 const ACCEPT = ["image/jpeg", "image/png"];
+
+/** Periksa isi berkas (byte awal), bukan hanya ekstensi atau tipe dari browser (NFR-09). */
+async function isRealImage(file: File): Promise<boolean> {
+  const b = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+  const jpg = b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+  const png =
+    b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 &&
+    b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a;
+  return file.type === "image/jpeg" ? jpg : png;
+}
 
 type Props = {
   photos: Photo[];
@@ -38,7 +48,7 @@ export default function PhotoUpload({ photos, onChange, error }: Props) {
   );
 
   function handlePick(e: ChangeEvent<HTMLInputElement>) {
-    addFiles(Array.from(e.target.files ?? []));
+    void addFiles(Array.from(e.target.files ?? []));
     e.target.value = "";
   }
 
@@ -46,7 +56,7 @@ export default function PhotoUpload({ photos, onChange, error }: Props) {
     e.preventDefault();
     setDragging(false);
     if (full) return;
-    addFiles(Array.from(e.dataTransfer.files));
+    void addFiles(Array.from(e.dataTransfer.files));
   }
 
   function handleDragOver(e: DragEvent<HTMLDivElement>) {
@@ -59,13 +69,13 @@ export default function PhotoUpload({ photos, onChange, error }: Props) {
       setDragging(false);
   }
 
-  function addFiles(picked: File[]) {
+  async function addFiles(picked: File[]) {
     const problems: string[] = [];
     const accepted: Photo[] = [];
 
     for (const file of picked) {
-      if (!ACCEPT.includes(file.type)) {
-        problems.push(`"${file.name}" bukan JPG/PNG.`);
+      if (!ACCEPT.includes(file.type) || !(await isRealImage(file))) {
+        problems.push(`"${file.name}" bukan gambar JPG/PNG yang valid.`);
       } else if (file.size > MAX_PHOTO_BYTES) {
         problems.push(`"${file.name}" lebih dari 2 MB.`);
       } else if (photos.length + accepted.length >= MAX_PHOTOS) {

@@ -1,9 +1,3 @@
-/**
- * Penyimpanan DUMMY di browser (localStorage) supaya form, Laporan Saya,
- * Cari Barang, Klaim Saya, Jadwal, Notifikasi, dan Akun saling terhubung
- * tanpa Supabase. Ganti isi fungsi di file ini dengan pemanggilan Supabase
- * saat backend siap; halaman-halaman lain tidak perlu diubah.
- */
 import { useSyncExternalStore } from "react";
 import { OTHER_CATEGORY } from "../utils/reportOptions";
 import { shorten } from "../utils/format";
@@ -26,6 +20,7 @@ export type NotifType = "Klaim" | "Jadwal" | "Laporan" | "Sistem";
 
 export type Report = {
   id: string;
+  kode?: string;
   kind: ReportKind;
   ownerId: string;
   category: string;
@@ -35,16 +30,17 @@ export type Report = {
   brand: string;
   location: string;
   area: string;
+  areaId?: string;
   date: string;
   time: string;
-  /** Ciri rahasia, hanya untuk laporan temuan dan hanya terlihat pemilik. */
   secrets: string[];
   status: ReportStatus;
   createdAt: string;
-  /** URL pratinjau, hanya berlaku selama tab terbuka. */
   photos: string[];
+  photoIds?: string[];
   closeReason?: string;
 };
+
 
 export type Claim = {
   id: string;
