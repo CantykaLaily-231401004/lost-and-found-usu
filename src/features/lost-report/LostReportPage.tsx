@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import AppShell from "../../shared/components/AppShell";
 import Alert from "../../shared/components/Alert";
@@ -13,22 +13,53 @@ import Icon from "../../shared/components/Icon";
 import ReportFields from "../../shared/components/ReportFields";
 import ReportSuccess from "../../shared/components/ReportSuccess";
 import { useSessionUser } from "../../shared/hooks/useSessionUser";
+import type { Report } from "../../shared/store/lofiStore";
+import { fetchAreas, type Area } from "../../services/areas";
 import {
-  addReport,
-  updateReport,
-  useLofiStore,
-} from "../../shared/store/lofiStore";
+  createLostReport,
+  getMyActiveLostReport,
+  updateLostReport,
+  uploadLostPhoto,
+  type LostReportInput,
+} from "../../services/lostReports";
+import { ServiceError, errorMessage } from "../../services/rpc";
 import {
   MIN_DESCRIPTION,
   emptyReport,
   focusFirstError,
   reportToValues,
-  submitReportDummy,
   validateReport,
-  valuesToInput,
   type ReportErrors,
   type ReportValues,
 } from "../../shared/utils/reportForm";
+
+/** Nama kolom dari RPC (public.rpc_field_error) -> nama kolom di form. */
+const FIELD_FROM_DB: Record<string, keyof ReportValues> = {
+  kategori: "category",
+  kategori_lainnya: "categoryOther",
+  deskripsi: "description",
+  warna: "color",
+  merek: "brand",
+  lokasi_kehilangan: "location",
+  area_id: "area",
+  tanggal_kehilangan: "date",
+  jam_kehilangan: "time",
+  photos: "photos",
+};
+
+function toInput(v: ReportValues): LostReportInput {
+  return {
+    category: v.category,
+    categoryOther: v.categoryOther.trim(),
+    description: v.description.trim(),
+    color: v.color.trim(),
+    brand: v.brand.trim(),
+    location: v.location.trim(),
+    areaId: v.area,
+    date: v.date,
+    time: v.time,
+  };
+}
 
 const TIPS = [
   "Sebutkan ciri khas: stiker, goresan, gantungan, atau isi barang.",
@@ -52,26 +83,38 @@ function LostReportForm({
   editId?: string;
 }) {
   const navigate = useNavigate();
-  const store = useLofiStore();
   const formRef = useRef<HTMLFormElement>(null);
 
-  const existing = editId
-    ? store.reports.find(
-        (r) =>
-          r.id === editId &&
-          r.kind === "lost" &&
-          r.ownerId === ownerId &&
-          r.status === "Aktif",
-      )
-    : undefined;
-
-  const [values, setValues] = useState<ReportValues>(() =>
-    existing ? reportToValues(existing) : emptyReport,
-  );
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [existing, setExisting] = useState<Report | null>(null);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "missing" | "error">("loading");
+  const [values, setValues] = useState<ReportValues>(emptyReport);
   const [errors, setErrors] = useState<ReportErrors>({});
   const [formError, setFormError] = useState("");
+  const [uploadFailed, setUploadFailed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [doneId, setDoneId] = useState<string | null>(null);
+  // Satu kunci per form: kiriman ulang (klik ganda, koneksi putus) tidak membuat laporan ganda (FR-07).
+  const [requestId, setRequestId] = useState(() => crypto.randomUUID());
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([fetchAreas(), editId ? getMyActiveLostReport(editId, ownerId) : null])
+      .then(([list, report]) => {
+        if (!active) return;
+        setAreas(list);
+        if (editId && !report) return setLoadState("missing");
+        if (report) {
+          setExisting(report);
+          setValues(reportToValues(report));
+        }
+        setLoadState("ready");
+      })
+      .catch(() => active && setLoadState("error"));
+    return () => {
+      active = false;
+    };
+  }, [editId, ownerId]);
 
   function change<K extends keyof ReportValues>(
     field: K,
@@ -79,12 +122,30 @@ function LostReportForm({
   ) {
     setValues((v) => ({ ...v, [field]: value }));
     if (errors[field]) setErrors((e) => ({ ...e, [field]: undefined }));
+    if (field === "photos") setUploadFailed(false);
   }
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  /** Unggah foto baru yang belum punya path. Path disimpan di state supaya kiriman ulang tidak mengunggah dua kali. */
+  async function uploadNewPhotos(): Promise<ReportValues["photos"]> {
+    const folder = `${ownerId}/${existing ? existing.id : requestId}`;
+    const photos = await Promise.all(
+      values.photos.map(async (p) =>
+        p.file && !p.path ? { ...p, path: await uploadLostPhoto(folder, p.file) } : p,
+      ),
+    );
+    setValues((v) => ({ ...v, photos }));
+    return photos;
+  }
+
+  async function handleSubmit(e?: FormEvent, withoutPhotos = false) {
+    e?.preventDefault();
     setFormError("");
-    const next = validateReport(values, "lost");
+    setUploadFailed(false);
+    const current = withoutPhotos
+      ? { ...values, photos: values.photos.filter((p) => !p.file) }
+      : values;
+    if (withoutPhotos) setValues(current);
+    const next = validateReport(current, "lost");
     setErrors(next);
     if (Object.keys(next).length > 0) {
       requestAnimationFrame(() => focusFirstError(formRef.current));
@@ -92,16 +153,39 @@ function LostReportForm({
     }
     setLoading(true);
     try {
-      await submitReportDummy("lost");
-      const input = await valuesToInput("lost", values);
-      if (existing) {
-        updateReport(existing.id, input);
-        setDoneId(existing.id);
-      } else {
-        setDoneId(addReport(input, ownerId).id);
+      let photos = current.photos;
+      if (!withoutPhotos) {
+        try {
+          photos = await uploadNewPhotos();
+        } catch {
+          setUploadFailed(true);
+          setFormError("Foto gagal diunggah. Coba kirim lagi, atau kirim laporan tanpa foto baru.");
+          return;
+        }
       }
-    } catch {
-      setFormError("Laporan belum tersimpan. Periksa koneksi lalu coba lagi.");
+      const newPaths = photos.filter((p) => p.file && p.path).map((p) => p.path as string);
+      const input = toInput(current);
+      if (existing) {
+        const keptIds = new Set(photos.map((p) => p.id).filter(Boolean));
+        const removeIds = (existing.photoIds ?? []).filter((id) => !keptIds.has(id));
+        const res = await updateLostReport(existing.id, input, newPaths, removeIds);
+        setDoneId(res.kode);
+      } else {
+        const res = await createLostReport(input, requestId, newPaths);
+        setDoneId(res.kode);
+      }
+    } catch (err) {
+      const field = err instanceof ServiceError && err.field ? FIELD_FROM_DB[err.field] : undefined;
+      if (field) {
+        setErrors({ [field]: errorMessage(err) });
+        requestAnimationFrame(() => focusFirstError(formRef.current));
+      } else {
+        setFormError(
+          err instanceof ServiceError && err.code !== "UNKNOWN" && err.code !== "NETWORK"
+            ? err.message
+            : "Laporan belum tersimpan. Periksa koneksi lalu coba lagi.",
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -111,16 +195,24 @@ function LostReportForm({
     setValues(emptyReport);
     setErrors({});
     setFormError("");
+    setUploadFailed(false);
     setDoneId(null);
+    setRequestId(crypto.randomUUID());
   }
 
-  if (editId && !existing && !doneId) {
+  if (loadState === "loading") return <AppShell>{null}</AppShell>;
+
+  if (loadState === "missing" || loadState === "error") {
     return (
       <AppShell>
         <EmptyState
           icon="alert"
-          title="Laporan tidak dapat diubah"
-          body="Laporan tidak ditemukan, sudah ditutup, atau bukan milik Anda."
+          title={loadState === "missing" ? "Laporan tidak dapat diubah" : "Gagal memuat formulir"}
+          body={
+            loadState === "missing"
+              ? "Laporan tidak ditemukan, sudah ditutup, atau bukan milik Anda."
+              : "Periksa koneksi Anda lalu muat ulang halaman."
+          }
           action={
             <Link to="/laporan-saya">
               <Button
@@ -144,7 +236,7 @@ function LostReportForm({
       ok: values.description.trim().length >= MIN_DESCRIPTION,
     },
     { label: "Lokasi kejadian", ok: !!values.location.trim() },
-    { label: "Fakultas / gedung", ok: !!values.area },
+    { label: "Area kampus", ok: !!values.area },
     { label: "Tanggal kejadian", ok: !!values.date },
   ];
   const done = checks.filter((c) => c.ok).length;
@@ -156,7 +248,7 @@ function LostReportForm({
         title={existing ? "Ubah Laporan Kehilangan" : "Laporan Kehilangan"}
         subtitle={
           existing
-            ? `Perbarui informasi laporan ${existing.id}`
+            ? `Perbarui informasi laporan ${existing.kode ?? existing.id}`
             : "Isi formulir berikut untuk melaporkan barang yang hilang"
         }
         onBack={() => navigate(-1)}
@@ -187,10 +279,20 @@ function LostReportForm({
                   values={values}
                   errors={errors}
                   onChange={change}
+                  areaOptions={areas.map((a) => ({ value: a.id, label: a.name }))}
                 />
                 {formError && (
-                  <div className="px-5 pb-5 sm:px-6">
+                  <div className="space-y-2 px-5 pb-5 sm:px-6">
                     <Alert tone="error">{formError}</Alert>
+                    {uploadFailed && (
+                      <button
+                        type="button"
+                        onClick={() => void handleSubmit(undefined, true)}
+                        className="text-sm font-medium text-brand-800 underline"
+                      >
+                        Kirim tanpa foto baru
+                      </button>
+                    )}
                   </div>
                 )}
                 <FormFooter>

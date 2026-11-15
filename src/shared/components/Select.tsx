@@ -3,7 +3,7 @@ import { useId, type ReactNode, type SelectHTMLAttributes } from "react";
 type Props = SelectHTMLAttributes<HTMLSelectElement> & {
   label: ReactNode;
   placeholder: string;
-  options: readonly string[];
+  options: readonly (string | { value: string; label: string })[];
   error?: string;
   hint?: string;
 };
@@ -37,11 +37,15 @@ export default function Select({
           {...rest}
         >
           <option value="">{placeholder}</option>
-          {options.map((o) => (
-            <option key={o} value={o} className="text-gray-900">
-              {o}
-            </option>
-          ))}
+                    {options.map((o) => {
+            const { value, label } =
+              typeof o === "string" ? { value: o, label: o } : o;
+            return (
+              <option key={value} value={value} className="text-gray-900">
+                {label}
+              </option>
+            );
+          })}
         </select>
         <svg
           viewBox="0 0 20 20"

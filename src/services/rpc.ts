@@ -13,18 +13,21 @@ export type ServiceErrorCode =
 /** Error seragam dari service; `message` aman langsung ditampilkan ke pengguna. */
 export class ServiceError extends Error {
   readonly code: ServiceErrorCode;
+  /** Nama kolom yang salah (dari public.rpc_field_error), bila ada. */
+  readonly field?: string;
 
-  constructor(code: ServiceErrorCode, message: string) {
+  constructor(code: ServiceErrorCode, message: string, field?: string) {
     super(message);
     this.name = "ServiceError";
     this.code = code;
+    this.field = field;
   }
 }
 
 /** Bentuk balasan semua RPC: { ok: true, data } atau { ok: false, error }. */
 type RpcResult<T> =
   | { ok: true; data: T }
-  | { ok: false; error?: { code?: string; message?: string } };
+  | { ok: false; error?: { code?: string; message?: string; field?: string } };
 
 const KNOWN_CODES: ServiceErrorCode[] = [
   "UNAUTHORIZED",
@@ -98,6 +101,7 @@ export async function callRpc<T>(
     throw new ServiceError(
       normalizeCode(res.error?.code),
       res.error?.message || "Terjadi kesalahan. Coba lagi.",
+      res.error?.field,
     );
   return res.data;
 }
