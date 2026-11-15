@@ -5,8 +5,8 @@ import { useAdminSession } from "../../shared/hooks/useIsAdmin";
 import { formatDateTime } from "../../shared/utils/format";
 import AdminShell from "./AdminShell";
 import { useAdminStore, type AuditType } from "./adminStore";
-import { card, inputCls } from "./adminstyles";
-import { PageTitle } from "./adminUI";
+import { card, inputCls } from "./adminStyles";
+import { PageTitle } from "./adminUi";
 
 const ICON: Record<AuditType, IconName> = {
   Klaim: "clipboard",

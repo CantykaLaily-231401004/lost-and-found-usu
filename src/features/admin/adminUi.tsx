@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import Icon, { type IconName } from "../../shared/components/Icon";
-import { card } from "./adminstyles";
+import { card } from "./adminStyles";
 
 export function PageTitle({
   eyebrow,

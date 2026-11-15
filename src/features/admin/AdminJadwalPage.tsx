@@ -22,8 +22,8 @@ import {
   useAdminActor,
   useScoped,
 } from "./adminStore";
-import { card, smallBtn } from "./adminstyles";
-import { PageTitle } from "./adminUI";
+import { card, smallBtn } from "./adminStyles";
+import { PageTitle } from "./adminUi";
 
 type Tab = ScheduleStatus | "semua";
 type Dialog =

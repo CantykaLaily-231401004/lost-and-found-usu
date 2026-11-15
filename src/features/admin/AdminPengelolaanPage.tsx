@@ -16,8 +16,8 @@ import {
   useAdminStore,
   type AdminAccount,
 } from "./adminStore";
-import { card } from "./adminstyles";
-import { PageTitle } from "./adminUI";
+import { card } from "./adminStyles";
+import { PageTitle } from "./adminUi";
 
 const FACULTIES = CAMPUS_AREAS.filter((a) => a !== "Area Umum Kampus");
 
