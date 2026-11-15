@@ -11,8 +11,8 @@ import { CATEGORIES } from "../../shared/utils/reportOptions";
 import { formatDate, formatDateTime } from "../../shared/utils/format";
 import AdminShell from "./AdminShell";
 import { useScoped } from "./adminStore";
-import { card, inputCls } from "./adminstyles";
-import { PageTitle } from "./adminUI";
+import { card, inputCls } from "./adminStyles";
+import { PageTitle } from "./adminUi";
 
 type Tab = "semua" | "found" | "lost";
 

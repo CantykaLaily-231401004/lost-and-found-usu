@@ -10,8 +10,8 @@ import { categoryLabel, type Claim } from "../../shared/store/lofiStore";
 import { formatDateTime } from "../../shared/utils/format";
 import AdminShell from "./AdminShell";
 import { actApprove, actReject, useAdminActor, useScoped } from "./adminStore";
-import { CLAIM_TONE, card, smallBtn } from "./adminstyles";
-import { PageTitle } from "./adminUI";
+import { CLAIM_TONE, card, smallBtn } from "./adminStyles";
+import { PageTitle } from "./adminUi";
 
 type Tab = "Menunggu" | "Disetujui" | "Ditolak" | "semua";
 

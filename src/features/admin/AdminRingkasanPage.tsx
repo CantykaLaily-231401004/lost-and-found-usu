@@ -6,8 +6,8 @@ import { scheduleStatus } from "../../shared/store/lofiStore";
 import { formatDate, formatDateTime } from "../../shared/utils/format";
 import AdminShell from "./AdminShell";
 import { useAdminStore, useScoped } from "./adminStore";
-import { CLAIM_TONE, card } from "./adminstyles";
-import { PageTitle, Panel } from "./adminUI";
+import { CLAIM_TONE, card } from "./adminStyles";
+import { PageTitle, Panel } from "./adminUi";
 
 const MONTHS = [
   "JAN",

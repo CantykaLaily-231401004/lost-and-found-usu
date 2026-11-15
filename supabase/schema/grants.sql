@@ -1,0 +1,73 @@
+begin;
+
+set check_function_bodies = false;
+set search_path = public, extensions;
+
+revoke all on table public.areas from anon, authenticated;
+grant select on table public.areas to authenticated;
+revoke all on table public.audit_records from anon, authenticated;
+grant select on table public.audit_records to authenticated;
+revoke all on table public.claims from anon, authenticated;
+grant select on table public.claims to authenticated;
+revoke all on table public.data_rahasia from anon, authenticated;
+grant select on table public.data_rahasia to authenticated;
+revoke all on table public.found_reports from anon, authenticated;
+grant select on table public.found_reports to authenticated;
+revoke all on table public.handover_schedules from anon, authenticated;
+grant select on table public.handover_schedules to authenticated;
+revoke all on table public.lost_reports from anon, authenticated;
+grant select on table public.lost_reports to authenticated;
+revoke all on table public.notifications from anon, authenticated;
+grant select on table public.notifications to authenticated;
+revoke all on table public.outbox_surel from anon, authenticated;
+revoke all on table public.penugasan_admin from anon, authenticated;
+grant select on table public.penugasan_admin to authenticated;
+revoke all on table public.photos from anon, authenticated;
+grant select, delete on table public.photos to authenticated;
+revoke all on table public.users from anon, authenticated;
+grant select on table public.users to authenticated;
+
+
+grant update (nama, kontak) on table public.users to authenticated;
+grant insert (user_id, area_id, client_request_id, kategori, deskripsi, warna, merek, lokasi_kehilangan, tanggal_kehilangan) on table public.lost_reports to authenticated;
+grant update (area_id, kategori, deskripsi, warna, merek, lokasi_kehilangan, tanggal_kehilangan) on table public.lost_reports to authenticated;
+grant update (status_baca) on table public.notifications to authenticated;
+grant insert (found_id, lost_id, storage_path, keterangan) on table public.photos to authenticated;
+grant update (area_id, kategori, deskripsi, warna, merek, lokasi_temuan, tanggal_temuan) on table public.found_reports to authenticated;
+
+revoke all on function public.can_view_handover(p_claim_id uuid) from public, anon, authenticated;
+grant execute on function public.can_view_handover(p_claim_id uuid) to authenticated;
+revoke all on function public.has_active_claim(p_found_id uuid) from public, anon, authenticated;
+grant execute on function public.has_active_claim(p_found_id uuid) to authenticated;
+revoke all on function public.internal_notify(p_user_id uuid, p_jenis text, p_pesan text) from public, anon, authenticated;
+revoke all on function public.is_admin_for_area(p_area_id uuid) from public, anon, authenticated;
+grant execute on function public.is_admin_for_area(p_area_id uuid) to authenticated;
+revoke all on function public.is_admin_pusat() from public, anon, authenticated;
+grant execute on function public.is_admin_pusat() to authenticated;
+revoke all on function public.is_verified() from public, anon, authenticated;
+grant execute on function public.is_verified() to authenticated;
+revoke all on function public.rpc_approve_claim(p_claim_id uuid, p_ciri_cocok integer[], p_alasan text) from public, anon, authenticated;
+grant execute on function public.rpc_approve_claim(p_claim_id uuid, p_ciri_cocok integer[], p_alasan text) to authenticated;
+revoke all on function public.rpc_cancel_claim(p_claim_id uuid, p_alasan text) from public, anon, authenticated;
+grant execute on function public.rpc_cancel_claim(p_claim_id uuid, p_alasan text) to authenticated;
+revoke all on function public.rpc_cancel_schedule(p_schedule_id uuid, p_alasan text) from public, anon, authenticated;
+grant execute on function public.rpc_cancel_schedule(p_schedule_id uuid, p_alasan text) to authenticated;
+revoke all on function public.rpc_close_found_report(p_found_id uuid, p_alasan text) from public, anon, authenticated;
+grant execute on function public.rpc_close_found_report(p_found_id uuid, p_alasan text) to authenticated;
+revoke all on function public.rpc_close_lost_report(p_lost_id uuid, p_alasan text) from public, anon, authenticated;
+grant execute on function public.rpc_close_lost_report(p_lost_id uuid, p_alasan text) to authenticated;
+revoke all on function public.rpc_complete_handover(p_schedule_id uuid, p_konfirmasi_pemilik boolean, p_konfirmasi_penyerah boolean) from public, anon, authenticated;
+grant execute on function public.rpc_complete_handover(p_schedule_id uuid, p_konfirmasi_pemilik boolean, p_konfirmasi_penyerah boolean) to authenticated;
+revoke all on function public.rpc_create_found_report(p_area_id uuid, p_kategori text, p_deskripsi text, p_lokasi_temuan text, p_tanggal_temuan timestamp with time zone, p_ciri_rahasia text[], p_warna text, p_merek text, p_client_request_id uuid) from public, anon, authenticated;
+grant execute on function public.rpc_create_found_report(p_area_id uuid, p_kategori text, p_deskripsi text, p_lokasi_temuan text, p_tanggal_temuan timestamp with time zone, p_ciri_rahasia text[], p_warna text, p_merek text, p_client_request_id uuid) to authenticated;
+revoke all on function public.rpc_create_schedule(p_claim_id uuid, p_waktu timestamp with time zone, p_lokasi text, p_catatan text) from public, anon, authenticated;
+grant execute on function public.rpc_create_schedule(p_claim_id uuid, p_waktu timestamp with time zone, p_lokasi text, p_catatan text) to authenticated;
+revoke all on function public.rpc_error(p_code text, p_message text) from public, anon, authenticated;
+revoke all on function public.rpc_reject_claim(p_claim_id uuid, p_alasan text) from public, anon, authenticated;
+grant execute on function public.rpc_reject_claim(p_claim_id uuid, p_alasan text) to authenticated;
+revoke all on function public.rpc_submit_claim(p_found_id uuid, p_ciri_kepemilikan text) from public, anon, authenticated;
+grant execute on function public.rpc_submit_claim(p_found_id uuid, p_ciri_kepemilikan text) to authenticated;
+revoke all on function public.rpc_update_schedule(p_schedule_id uuid, p_waktu timestamp with time zone, p_lokasi text, p_catatan text) from public, anon, authenticated;
+grant execute on function public.rpc_update_schedule(p_schedule_id uuid, p_waktu timestamp with time zone, p_lokasi text, p_catatan text) to authenticated;
+
+commit;
