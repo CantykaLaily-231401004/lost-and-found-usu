@@ -110,7 +110,7 @@ export function validateReport(
 
 /** Fokus ke kolom pertama yang bermasalah di dalam form. */
 export function focusFirstError(root: HTMLElement | null) {
-  const el = root?.querySelector<HTMLElement>('[aria-invalid="true"]');
+  const el = root?.querySelector<HTMLElement>('[aria-invalid="true"]:not([hidden] *)');
   if (!el) return;
   el.scrollIntoView({ block: "center", behavior: "smooth" });
   el.focus({ preventScroll: true });

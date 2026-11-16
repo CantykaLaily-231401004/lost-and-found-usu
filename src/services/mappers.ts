@@ -98,17 +98,6 @@ export function timestampToWib(iso: string): { date: string; time: string } {
 
 type AreaJoin = { areas?: { nama_area: string } | null };
 
-type ReportRowBase = AreaJoin & {
-  user_id: string;
-  area_id: string;
-  kategori: string;
-  deskripsi: string;
-  warna: string | null;
-  merek: string | null;
-  status: DbReportStatus;
-  created_at: string;
-};
-
 export type LostReportRow = AreaJoin & {
   lost_id: string;
   kode: string;
@@ -127,27 +116,25 @@ export type LostReportRow = AreaJoin & {
   photos?: { photo_id: string; storage_path: string }[];
 };
 
-export type FoundReportRow = ReportRowBase & {
+export type FoundReportRow = AreaJoin & {
   found_id: string;
+  kode: string;
+  user_id: string;
+  area_id: string;
+  kategori: string;
+  kategori_lainnya: string | null;
+  deskripsi: string;
+  warna: string | null;
+  merek: string | null;
   lokasi_temuan: string;
   tanggal_temuan: string;
+  jam_temuan: string | null;
+  status: DbReportStatus;
+  created_at: string;
+  photos?: { photo_id: string; storage_path: string }[];
+  /** Hanya terisi untuk pelapor dan admin berwenang (RLS rahasia_select); selain itu null. */
+  data_rahasia?: { ciri_rahasia: string[] } | { ciri_rahasia: string[] }[] | null;
 };
-
-function reportBase(row: ReportRowBase, when: string) {
-  return {
-    ownerId: row.user_id,
-    ...categoryFromDb(row.kategori),
-    description: row.deskripsi,
-    color: row.warna ?? "",
-    brand: row.merek ?? "",
-    area: row.areas?.nama_area ?? "",
-    ...timestampToWib(when),
-    status: reportStatusFromDb(row.status),
-    createdAt: row.created_at,
-    secrets: [] as string[],
-    photos: [] as string[],
-  };
-}
 
 export function lostRowToReport(
   row: LostReportRow,
@@ -177,13 +164,32 @@ export function lostRowToReport(
   };
 }
 
-/** Baris found_reports (boleh dengan join `areas(nama_area)`) -> Report. */
-export function foundRowToReport(row: FoundReportRow): Report {
+export function foundRowToReport(
+  row: FoundReportRow,
+  photoUrl: (path: string) => string = () => "",
+): Report {
+  const photos = row.photos ?? [];
+  const rahasia = Array.isArray(row.data_rahasia) ? row.data_rahasia[0] : row.data_rahasia;
   return {
-    ...reportBase(row, row.tanggal_temuan),
     id: row.found_id,
+    kode: row.kode,
     kind: "found",
+    ownerId: row.user_id,
+    category: row.kategori,
+    categoryOther: row.kategori_lainnya ?? "",
+    description: row.deskripsi,
+    color: row.warna ?? "",
+    brand: row.merek ?? "",
     location: row.lokasi_temuan,
+    area: row.areas?.nama_area ?? "",
+    areaId: row.area_id,
+    date: row.tanggal_temuan,
+    time: row.jam_temuan?.slice(0, 5) ?? "",
+    secrets: rahasia?.ciri_rahasia ?? [],
+    status: reportStatusFromDb(row.status),
+    createdAt: row.created_at,
+    photos: photos.map((p) => photoUrl(p.storage_path)),
+    photoIds: photos.map((p) => p.photo_id),
   };
 }
 
