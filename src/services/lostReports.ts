@@ -3,7 +3,7 @@ import { callRpc, ServiceError, toServiceError } from "./rpc";
 import { lostRowToReport, type LostReportRow } from "./mappers";
 import type { Report } from "../shared/store/lofiStore";
 
-const BUCKET = "report-photos";
+export const BUCKET = "report-photos";
 const SIGNED_URL_SECONDS = 60 * 60;
 
 const SELECT =
@@ -59,7 +59,7 @@ export async function uploadLostPhoto(folder: string, file: File): Promise<strin
   return path;
 }
 
-async function signedUrls(paths: string[]): Promise<Map<string, string>> {
+export async function signedUrls(paths: string[]): Promise<Map<string, string>> {
   if (paths.length === 0) return new Map();
   const { data, error } = await supabase.storage
     .from(BUCKET)

@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import AppShell from "../../shared/components/AppShell";
 import Alert from "../../shared/components/Alert";
@@ -17,25 +17,80 @@ import Req from "../../shared/components/Req";
 import Stepper from "../../shared/components/Stepper";
 import TextField from "../../shared/components/TextField";
 import { useSessionUser } from "../../shared/hooks/useSessionUser";
+import type { Report } from "../../shared/store/lofiStore";
+import { fetchAreas, type Area } from "../../services/areas";
 import {
-  addReport,
-  hasActiveClaim,
-  updateReport,
-  useLofiStore,
-} from "../../shared/store/lofiStore";
+  createFoundReport,
+  getMyEditableFoundReport,
+  updateFoundReport,
+  uploadFoundPhoto,
+  type FoundReportInput,
+} from "../../services/foundReports";
+import { ServiceError, errorMessage } from "../../services/rpc";
 import {
   emptyReport,
   focusFirstError,
   reportToValues,
-  submitReportDummy,
   validateReport,
-  valuesToInput,
   type ReportErrors,
   type ReportValues,
 } from "../../shared/utils/reportForm";
 
 const STEPS = ["Info Publik", "Ciri Rahasia", "Pratinjau"] as const;
+/** Form menyediakan 3 kolom (1 wajib); database menerima 1–5 ciri. */
 const SECRET_SLOTS = 3;
+const MIN_SECRET = 3;
+const MAX_SECRET = 500;
+
+/** Nama kolom dari RPC (public.rpc_field_error) -> nama kolom di form. */
+const FIELD_FROM_DB: Record<string, keyof ReportValues> = {
+  kategori: "category",
+  kategori_lainnya: "categoryOther",
+  deskripsi: "description",
+  warna: "color",
+  merek: "brand",
+  lokasi_temuan: "location",
+  area_id: "area",
+  tanggal_temuan: "date",
+  jam_temuan: "time",
+  photos: "photos",
+};
+
+function toInput(v: ReportValues): FoundReportInput {
+  return {
+    category: v.category,
+    categoryOther: v.categoryOther.trim(),
+    description: v.description.trim(),
+    color: v.color.trim(),
+    brand: v.brand.trim(),
+    location: v.location.trim(),
+    areaId: v.area,
+    date: v.date,
+    time: v.time,
+  };
+}
+
+/** Error per kolom ciri. Kolom kosong dilewati; minimal satu kolom harus terisi. */
+function validateSecrets(secrets: string[]): string[] {
+  const errs: string[] = secrets.map((s) => {
+    const n = s.trim().length;
+    if (n === 0) return "";
+    if (n < MIN_SECRET) return `Minimal ${MIN_SECRET} karakter.`;
+    if (n > MAX_SECRET) return `Maksimal ${MAX_SECRET} karakter.`;
+    return "";
+  });
+  if (secrets.every((s) => !s.trim()))
+    errs[0] = `Isi minimal satu ciri rahasia (minimal ${MIN_SECRET} karakter).`;
+  return errs;
+}
+
+/** "Ciri rahasia ke-2 ..." dari RPC dihitung dari ciri yang terisi; ubah ke nomor kolom di form. */
+function secretSlotFromMessage(secrets: string[], message: string): number {
+  const n = Number(/ke-(\d+)/.exec(message)?.[1] ?? 0);
+  if (!n) return 0;
+  const filled = secrets.map((s, i) => (s.trim() ? i : -1)).filter((i) => i >= 0);
+  return filled[n - 1] ?? 0;
+}
 
 const STEP_HINTS = [
   "Isi data yang akan tampil di katalog publik.",
@@ -73,33 +128,48 @@ function FoundReportForm({
   editId?: string;
 }) {
   const navigate = useNavigate();
-  const store = useLofiStore();
   const formRef = useRef<HTMLFormElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
 
-  const existing = editId
-    ? store.reports.find(
-        (r) =>
-          r.id === editId &&
-          r.kind === "found" &&
-          r.ownerId === ownerId &&
-          r.status === "Tersedia" &&
-          !hasActiveClaim(store, r.id),
-      )
-    : undefined;
-
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [existing, setExisting] = useState<Report | null>(null);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "missing" | "error">("loading");
   const [step, setStep] = useState(0);
-  const [values, setValues] = useState<ReportValues>(() =>
-    existing ? reportToValues(existing) : emptyReport,
-  );
-  const [secrets, setSecrets] = useState<string[]>(() =>
-    Array.from({ length: SECRET_SLOTS }, (_, i) => existing?.secrets[i] ?? ""),
-  );
+  const [values, setValues] = useState<ReportValues>(emptyReport);
+  const [secrets, setSecrets] = useState<string[]>(() => Array(SECRET_SLOTS).fill(""));
   const [errors, setErrors] = useState<ReportErrors>({});
-  const [secretError, setSecretError] = useState("");
+  const [secretErrors, setSecretErrors] = useState<string[]>([]);
   const [formError, setFormError] = useState("");
+  const [uploadFailed, setUploadFailed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [doneId, setDoneId] = useState<string | null>(null);
+  // Satu kunci per form: kiriman ulang (klik ganda, koneksi putus) tidak membuat laporan ganda (FR-09).
+  const [requestId, setRequestId] = useState(() => crypto.randomUUID());
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([fetchAreas(), editId ? getMyEditableFoundReport(editId, ownerId) : null])
+      .then(([list, report]) => {
+        if (!active) return;
+        setAreas(list);
+        if (editId && !report) return setLoadState("missing");
+        if (report) {
+          setExisting(report);
+          setValues(reportToValues(report));
+          setSecrets(
+            Array.from(
+              { length: Math.max(SECRET_SLOTS, report.secrets.length) },
+              (_, i) => report.secrets[i] ?? "",
+            ),
+          );
+        }
+        setLoadState("ready");
+      })
+      .catch(() => active && setLoadState("error"));
+    return () => {
+      active = false;
+    };
+  }, [editId, ownerId]);
 
   function change<K extends keyof ReportValues>(
     field: K,
@@ -107,6 +177,7 @@ function FoundReportForm({
   ) {
     setValues((v) => ({ ...v, [field]: value }));
     if (errors[field]) setErrors((e) => ({ ...e, [field]: undefined }));
+    if (field === "photos") setUploadFailed(false);
   }
 
   function goTo(n: number) {
@@ -126,34 +197,78 @@ function FoundReportForm({
       }
       goTo(1);
     } else if (step === 1) {
-      if (secrets.every((s) => s.trim().length < 3)) {
-        setSecretError("Isi minimal satu ciri rahasia (minimal 3 karakter).");
+      const next = validateSecrets(secrets);
+      setSecretErrors(next);
+      if (next.some(Boolean)) {
         requestAnimationFrame(() => focusFirstError(formRef.current));
         return;
       }
-      setSecretError("");
       goTo(2);
     }
   }
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  /** Unggah foto baru yang belum punya path. Path disimpan di state supaya kiriman ulang tidak mengunggah dua kali. */
+  async function uploadNewPhotos(): Promise<ReportValues["photos"]> {
+    const folder = `${ownerId}/${existing ? existing.id : requestId}`;
+    const photos = await Promise.all(
+      values.photos.map(async (p) =>
+        p.file && !p.path ? { ...p, path: await uploadFoundPhoto(folder, p.file) } : p,
+      ),
+    );
+    setValues((v) => ({ ...v, photos }));
+    return photos;
+  }
+
+  async function handleSubmit(e?: FormEvent, withoutPhotos = false) {
+    e?.preventDefault();
     if (step < 2) return handleNext();
     setFormError("");
+    setUploadFailed(false);
+    const current = withoutPhotos
+      ? { ...values, photos: values.photos.filter((p) => !p.file) }
+      : values;
+    if (withoutPhotos) setValues(current);
     setLoading(true);
     try {
-      await submitReportDummy("found");
-      const input = await valuesToInput("found", values, secrets);
-      if (existing) {
-        updateReport(existing.id, input);
-        setDoneId(existing.id);
-      } else {
-        setDoneId(addReport(input, ownerId).id);
+      let photos = current.photos;
+      if (!withoutPhotos) {
+        try {
+          photos = await uploadNewPhotos();
+        } catch {
+          setUploadFailed(true);
+          setFormError("Foto gagal diunggah. Coba kirim lagi, atau kirim laporan tanpa foto baru.");
+          return;
+        }
       }
-    } catch {
-      setFormError(
-        "Laporan belum tersimpan dan belum diterbitkan. Periksa koneksi lalu coba lagi.",
-      );
+      const newPaths = photos.filter((p) => p.file && p.path).map((p) => p.path as string);
+      const input = toInput(current);
+      if (existing) {
+        const keptIds = new Set(photos.map((p) => p.id).filter(Boolean));
+        const removeIds = (existing.photoIds ?? []).filter((id) => !keptIds.has(id));
+        const res = await updateFoundReport(existing.id, input, secrets, newPaths, removeIds);
+        setDoneId(res.kode);
+      } else {
+        const res = await createFoundReport(input, secrets, requestId, newPaths);
+        setDoneId(res.kode);
+      }
+    } catch (err) {
+      const dbField = err instanceof ServiceError ? err.field : undefined;
+      if (dbField === "ciri_rahasia") {
+        const slot = secretSlotFromMessage(secrets, errorMessage(err));
+        setSecretErrors(secrets.map((_, i) => (i === slot ? errorMessage(err) : "")));
+        goTo(1);
+        requestAnimationFrame(() => focusFirstError(formRef.current));
+      } else if (dbField && FIELD_FROM_DB[dbField]) {
+        setErrors({ [FIELD_FROM_DB[dbField]]: errorMessage(err) });
+        goTo(0);
+        requestAnimationFrame(() => focusFirstError(formRef.current));
+      } else {
+        setFormError(
+          err instanceof ServiceError && err.code !== "UNKNOWN" && err.code !== "NETWORK"
+            ? err.message
+            : "Laporan belum tersimpan dan belum diterbitkan. Periksa koneksi lalu coba lagi.",
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -163,22 +278,31 @@ function FoundReportForm({
     setValues(emptyReport);
     setSecrets(Array(SECRET_SLOTS).fill(""));
     setErrors({});
-    setSecretError("");
+    setSecretErrors([]);
     setFormError("");
+    setUploadFailed(false);
     setStep(0);
     setDoneId(null);
+    setRequestId(crypto.randomUUID());
   }
 
   const filledSecrets = secrets.map((s) => s.trim()).filter(Boolean);
   const when = values.date + (values.time ? `, ${values.time}` : "");
+  const areaName = areas.find((a) => a.id === values.area)?.name ?? values.area;
 
-  if (editId && !existing && !doneId) {
+  if (loadState === "loading") return <AppShell>{null}</AppShell>;
+
+  if (loadState === "missing" || loadState === "error") {
     return (
       <AppShell>
         <EmptyState
           icon="alert"
-          title="Laporan tidak dapat diubah"
-          body="Laporan hanya bisa diubah saat berstatus Tersedia dan belum ada klaim aktif. Jika perlu, hubungi admin."
+          title={loadState === "missing" ? "Laporan tidak dapat diubah" : "Gagal memuat formulir"}
+          body={
+            loadState === "missing"
+              ? "Laporan hanya bisa diubah saat berstatus Tersedia dan belum ada klaim aktif. Jika perlu, hubungi admin."
+              : "Periksa koneksi Anda lalu muat ulang halaman."
+          }
           action={
             <Link to="/laporan-saya">
               <Button
@@ -202,7 +326,7 @@ function FoundReportForm({
           title={existing ? "Ubah Laporan Penemuan" : "Laporan Penemuan"}
           subtitle={
             existing
-              ? `Perbarui informasi laporan ${existing.id}`
+              ? `Perbarui informasi laporan ${existing.kode ?? existing.id}`
               : "Isi formulir berikut untuk melaporkan barang yang Anda temukan"
           }
           onBack={() => navigate(-1)}
@@ -227,14 +351,15 @@ function FoundReportForm({
 
             <form ref={formRef} onSubmit={handleSubmit} noValidate>
               <FormCard>
-                {step === 0 && (
+                <div hidden={step !== 0} className="border-b border-gray-200/80">
                   <ReportFields
                     kind="found"
                     values={values}
                     errors={errors}
                     onChange={change}
+                    areaOptions={areas.map((a) => ({ value: a.id, label: a.name }))}
                   />
-                )}
+                </div>
 
                 {step === 1 && (
                   <FormSection
@@ -271,14 +396,17 @@ function FoundReportForm({
                             : "Ciri tambahan"
                         }
                         value={s}
+                        maxLength={MAX_SECRET}
                         onChange={(e) => {
                           const v = e.target.value;
                           setSecrets((arr) =>
                             arr.map((x, j) => (j === i ? v : x)),
                           );
-                          setSecretError("");
+                          setSecretErrors((arr) =>
+                            arr.map((x, j) => (j === i ? "" : x)),
+                          );
                         }}
-                        error={i === 0 ? secretError : undefined}
+                        error={secretErrors[i] || undefined}
                       />
                     ))}
                   </FormSection>
@@ -303,7 +431,7 @@ function FoundReportForm({
                         <Row label="Warna" value={values.color} />
                         <Row label="Merek" value={values.brand} />
                         <Row label="Lokasi" value={values.location} />
-                        <Row label="Area penanganan" value={values.area} />
+                        <Row label="Area penanganan" value={areaName} />
                         <Row label="Tanggal" value={when} />
                       </dl>
                       {values.photos.length > 0 && (
@@ -332,8 +460,8 @@ function FoundReportForm({
                       }
                     >
                       <ol className="list-decimal space-y-1 pl-5 text-sm text-gray-900">
-                        {filledSecrets.map((s) => (
-                          <li key={s}>{s}</li>
+                        {filledSecrets.map((s, i) => (
+                          <li key={i}>{s}</li>
                         ))}
                       </ol>
                     </FormSection>
@@ -341,8 +469,17 @@ function FoundReportForm({
                 )}
 
                 {formError && (
-                  <div className="px-5 pb-5 sm:px-6">
+                  <div className="space-y-2 px-5 pb-5 sm:px-6">
                     <Alert tone="error">{formError}</Alert>
+                    {uploadFailed && (
+                      <button
+                        type="button"
+                        onClick={() => void handleSubmit(undefined, true)}
+                        className="text-sm font-medium text-brand-800 underline"
+                      >
+                        Kirim tanpa foto baru
+                      </button>
+                    )}
                   </div>
                 )}
 

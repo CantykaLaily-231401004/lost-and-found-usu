@@ -13,18 +13,12 @@ import ReportThumb, {
   ReportStatusBadge,
 } from "../../shared/components/ReportThumb";
 import { useSessionUser } from "../../shared/hooks/useSessionUser";
-import {
-  categoryLabel,
-  closeReport,
-  hasActiveClaim,
-  useLofiStore,
-  type Report,
-} from "../../shared/store/lofiStore";
+import { categoryLabel, type Report } from "../../shared/store/lofiStore";
 import { formatDate, formatDateTime } from "../../shared/utils/format";
 import { closeLostReport, listMyLostReports } from "../../services/lostReports";
+import { closeFoundReport, listMyFoundReports } from "../../services/foundReports";
 import { errorMessage } from "../../services/rpc";
 
-/** Batas alasan penutupan, sama dengan rpc_close_lost_report. */
 const MIN_REASON = 10;
 const MAX_REASON = 300;
 
@@ -42,7 +36,6 @@ function isOpen(r: Report) {
 
 export default function LaporanSayaPage() {
   const { user } = useSessionUser();
-  const store = useLofiStore();
   const [tab, setTab] = useState<Tab>("semua");
   const [closing, setClosing] = useState<Report | null>(null);
   const [reason, setReason] = useState("");
@@ -50,9 +43,12 @@ export default function LaporanSayaPage() {
   const [reasonError, setReasonError] = useState("");
   const [closingBusy, setClosingBusy] = useState(false);
 
-  // Laporan kehilangan dari database; laporan temuan masih dari data dummy sampai Session 4.
   const [lostReports, setLostReports] = useState<Report[]>([]);
+  const [foundReports, setFoundReports] = useState<Report[]>([]);
   const [lostState, setLostState] = useState<"loading" | "ready" | "error">("loading");
+  const [foundState, setFoundState] = useState<"loading" | "ready" | "error">("loading");
+  
+  const [openSecrets, setOpenSecrets] = useState<Set<string>>(() => new Set());
 
   const [reloadKey, setReloadKey] = useState(0);
   const userId = user?.id;
@@ -67,18 +63,33 @@ export default function LaporanSayaPage() {
         setLostState("ready");
       })
       .catch(() => active && setLostState("error"));
+    listMyFoundReports(userId)
+      .then((list) => {
+        if (!active) return;
+        setFoundReports(list);
+        setFoundState("ready");
+      })
+      .catch(() => active && setFoundState("error"));
     return () => {
       active = false;
     };
   }, [userId, reloadKey]);
 
-  /** Muat ulang daftar laporan kehilangan dari database. */
+  /** Muat ulang daftar laporan kehilangan dan temuan dari database. */
   const loadLost = useCallback(() => setReloadKey((k) => k + 1), []);
 
-  const mine = [
-    ...lostReports,
-    ...store.reports.filter((r) => r.kind === "found" && r.ownerId === user?.id),
-  ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  function toggleSecrets(id: string) {
+    setOpenSecrets((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const mine = [...lostReports, ...foundReports].sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt),
+  );
   const shown = tab === "semua" ? mine : mine.filter((r) => r.kind === tab);
   const count = (k: "lost" | "found") =>
     mine.filter((r) => r.kind === k).length;
@@ -96,14 +107,10 @@ export default function LaporanSayaPage() {
     if (reason === "Alasan lain" && other.trim().length < MIN_REASON)
       return setReasonError(`Jelaskan alasan Anda (minimal ${MIN_REASON} karakter).`);
     const text = reason === "Alasan lain" ? other.trim() : reason;
-    if (closing.kind === "found") {
-      closeReport(closing.id, text);
-      setClosing(null);
-      return;
-    }
     setClosingBusy(true);
     try {
-      await closeLostReport(closing.id, text);
+      if (closing.kind === "found") await closeFoundReport(closing.id, text);
+      else await closeLostReport(closing.id, text);
       setClosing(null);
       loadLost();
     } catch (err) {
@@ -162,9 +169,13 @@ export default function LaporanSayaPage() {
         />
       </div>
 
-      {lostState === "error" && (
+      {(lostState === "error" || foundState === "error") && (
         <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
-          Laporan kehilangan gagal dimuat.{" "}
+          {lostState === "error" && foundState === "error"
+            ? "Laporan gagal dimuat."
+            : lostState === "error"
+              ? "Laporan kehilangan gagal dimuat."
+              : "Laporan penemuan gagal dimuat."}{" "}
           <button type="button" onClick={loadLost} className="font-medium underline">
             Coba lagi
           </button>
@@ -172,7 +183,7 @@ export default function LaporanSayaPage() {
       )}
 
       <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        {lostState === "loading" ? (
+        {lostState === "loading" || foundState === "loading" ? (
           <p className="text-sm text-gray-500 xl:col-span-2">Memuat laporan...</p>
         ) : shown.length === 0 ? (
           <div className="xl:col-span-2">
@@ -196,9 +207,9 @@ export default function LaporanSayaPage() {
         ) : (
           shown.map((r) => {
             const open = isOpen(r);
-            const locked = r.kind === "found" && hasActiveClaim(store, r.id);
+            const secretsOpen = openSecrets.has(r.id);
             const editPath =
-              r.kind === "lost"
+            r.kind === "lost"
                 ? `/lapor/kehilangan/${r.id}/ubah`
                 : `/lapor/temuan/${r.id}/ubah`;
             return (
@@ -239,19 +250,36 @@ export default function LaporanSayaPage() {
                     </span>
                     <span>Dibuat: {formatDateTime(r.createdAt)}</span>
                   </p>
-                  {r.kind === "found" && r.secrets.length > 0 && (
-                    <p className="mt-1 flex items-center gap-1.5 text-sm text-gray-500">
-                      <Icon name="lock" className="size-4" />
-                      {r.secrets.length} ciri rahasia tersimpan, hanya terlihat
-                      oleh Anda dan admin.
-                    </p>
+                                    {r.kind === "found" && r.secrets.length > 0 && (
+                    <div className="mt-1 text-sm text-gray-500">
+                      <p className="flex flex-wrap items-center gap-1.5">
+                        <Icon name="lock" className="size-4" />
+                        {r.secrets.length} ciri rahasia tersimpan, hanya terlihat
+                        oleh Anda dan admin.
+                        <button
+                          type="button"
+                          onClick={() => toggleSecrets(r.id)}
+                          aria-expanded={secretsOpen}
+                          className="font-medium text-brand-800 underline"
+                        >
+                          {secretsOpen ? "Sembunyikan" : "Lihat ciri rahasia"}
+                        </button>
+                      </p>
+                      {secretsOpen && (
+                        <ol className="mt-1.5 list-decimal space-y-0.5 rounded-lg bg-gray-50 py-2 pl-8 pr-3 text-gray-800">
+                          {r.secrets.map((s, i) => (
+                            <li key={i}>{s}</li>
+                          ))}
+                        </ol>
+                      )}
+                    </div>
                   )}
                   {r.closeReason && (
                     <p className="mt-1 text-sm text-gray-500">
                       Alasan ditutup: {r.closeReason}
                     </p>
                   )}
-                  {open && !locked && (
+                  {open && (
                     <div className="mt-2.5 flex items-center gap-2">
                       <Link to={editPath}>
                         <Button
@@ -270,12 +298,6 @@ export default function LaporanSayaPage() {
                         Tutup Laporan
                       </button>
                     </div>
-                  )}
-                  {open && locked && (
-                    <p className="mt-3 text-sm text-gray-500">
-                      Ada klaim aktif. Perubahan dan penutupan hanya bisa lewat
-                      admin.
-                    </p>
                   )}
                 </div>
               </article>
