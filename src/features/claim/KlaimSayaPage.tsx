@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import AppShell from "../../shared/components/AppShell";
 import Badge, { type BadgeTone } from "../../shared/components/Badge";
@@ -7,14 +7,18 @@ import ConfirmDialog from "../../shared/components/ConfirmDialog";
 import EmptyState from "../../shared/components/EmptyState";
 import Icon from "../../shared/components/Icon";
 import Tabs from "../../shared/components/Tabs";
+import TextArea from "../../shared/components/TextArea";
 import { useSessionUser } from "../../shared/hooks/useSessionUser";
+import { categoryLabel, type ClaimStatus } from "../../shared/store/lofiStore";
+import { formatDateTime, shorten } from "../../shared/utils/format";
+import type { MyClaim } from "../../services/mappers";
+import { errorMessage } from "../../services/rpc";
 import {
   cancelClaim,
-  useLofiStore,
-  type Claim,
-  type ClaimStatus,
-} from "../../shared/store/lofiStore";
-import { formatDateTime, shorten } from "../../shared/utils/format";
+  listMyClaims,
+  MAX_CANCEL_REASON,
+  MIN_CANCEL_REASON,
+} from "../../services/claims";
 
 type Tab = "semua" | "Menunggu" | "Disetujui" | "Ditolak";
 
@@ -26,17 +30,60 @@ const TONE: Record<ClaimStatus, BadgeTone> = {
   Selesai: "soft",
 };
 
+type Loaded = { key: string; claims: MyClaim[]; error: string };
+
 export default function KlaimSayaPage() {
   const { user } = useSessionUser();
-  const store = useLofiStore();
+  const userId = user?.id;
   const [tab, setTab] = useState<Tab>("semua");
-  const [cancelling, setCancelling] = useState<Claim | null>(null);
+  const [cancelling, setCancelling] = useState<MyClaim | null>(null);
+  const [reason, setReason] = useState("");
+  const [reasonError, setReasonError] = useState("");
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
 
-  const mine = store.claims
-    .filter((c) => c.ownerId === user?.id)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const requestKey = `${userId}|${reloadKey}`;
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    listMyClaims(userId)
+      .then((claims) => active && setLoaded({ key: requestKey, claims, error: "" }))
+      .catch(
+        (e) => active && setLoaded({ key: requestKey, claims: [], error: errorMessage(e) }),
+      );
+    return () => {
+      active = false;
+    };
+  }, [userId, requestKey]);
+
+  const loading = !loaded || loaded.key !== requestKey;
+  const mine = loaded?.claims ?? [];
   const by = (s: ClaimStatus) => mine.filter((c) => c.status === s).length;
   const shown = tab === "semua" ? mine : mine.filter((c) => c.status === tab);
+
+  function openCancel(c: MyClaim) {
+    setCancelling(c);
+    setReason("");
+    setReasonError("");
+  }
+
+  async function confirmCancel() {
+    if (!cancelling || cancelBusy) return;
+    const text = reason.trim();
+    if (text.length < MIN_CANCEL_REASON)
+      return setReasonError(`Tulis alasan pembatalan (minimal ${MIN_CANCEL_REASON} karakter).`);
+    setCancelBusy(true);
+    try {
+      await cancelClaim(cancelling.id, text);
+      setCancelling(null);
+      setReloadKey((k) => k + 1);
+    } catch (err) {
+      setReasonError(errorMessage(err));
+    } finally {
+      setCancelBusy(false);
+    }
+  }
 
   return (
     <AppShell wide>
@@ -74,7 +121,20 @@ export default function KlaimSayaPage() {
       </div>
 
       <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        {shown.length === 0 ? (
+        {loading ? (
+          <p className="text-sm text-gray-500 xl:col-span-2">Memuat klaim...</p>
+        ) : loaded.error ? (
+          <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 xl:col-span-2">
+            {loaded.error}{" "}
+            <button
+              type="button"
+              onClick={() => setReloadKey((k) => k + 1)}
+              className="font-medium underline"
+            >
+              Coba lagi
+            </button>
+          </p>
+        ) : shown.length === 0 ? (
           <div className="xl:col-span-2">
             <EmptyState
               icon="clipboard"
@@ -95,7 +155,7 @@ export default function KlaimSayaPage() {
           </div>
         ) : (
           shown.map((c) => {
-            const report = store.reports.find((r) => r.id === c.reportId);
+            const item = c.item;
             return (
               <article
                 key={c.id}
@@ -108,14 +168,19 @@ export default function KlaimSayaPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge tone={TONE[c.status]}>{c.status}</Badge>
-                    <span className="font-mono text-xs text-gray-500">
-                      {c.id}
-                    </span>
+                    {item && (
+                      <Link
+                        to={`/cari/${item.kode}`}
+                        className="font-mono text-xs text-gray-500 hover:text-brand-800 hover:underline"
+                      >
+                        {item.kode}
+                      </Link>
+                    )}
                   </div>
                   {c.status === "Menunggu" && (
                     <button
                       type="button"
-                      onClick={() => setCancelling(c)}
+                      onClick={() => openCancel(c)}
                       className="text-sm font-medium text-red-600 hover:underline"
                     >
                       Batalkan
@@ -123,12 +188,12 @@ export default function KlaimSayaPage() {
                   )}
                 </div>
                 <h2 className="mt-2 text-sm font-semibold leading-5 text-gray-900">
-                  {report
-                    ? `${shorten(report.description, 70)} — ${report.location}`
-                    : c.reportId}
+                  {item
+                    ? `${shorten(item.description, 70)} — ${item.location}`
+                    : "Barang tidak tersedia"}
                 </h2>
                 <p className="mt-0.5 text-sm text-gray-500">
-                  Diajukan: {formatDateTime(c.createdAt)}
+                  {item && `${categoryLabel(item)} · `}Diajukan: {formatDateTime(c.createdAt)}
                 </p>
                 <div className="mt-3 rounded-lg bg-surface px-3.5 py-2.5">
                   <p className="text-sm font-medium text-gray-900">
@@ -138,6 +203,17 @@ export default function KlaimSayaPage() {
                     {c.evidence}
                   </p>
                 </div>
+                {(c.status === "Ditolak" || c.status === "Dibatalkan") && c.reason && (
+                  <p className="mt-2 text-sm text-gray-600">
+                    <strong>
+                      {c.status === "Ditolak" ? "Alasan penolakan" : "Alasan pembatalan"}:
+                    </strong>{" "}
+                    {c.reason}
+                    {c.decidedAt && (
+                      <span className="text-gray-500"> ({formatDateTime(c.decidedAt)})</span>
+                    )}
+                  </p>
+                )}
                 {c.status === "Disetujui" && (
                   <p className="mt-3 rounded-lg border border-brand-700/30 bg-brand-50 px-3.5 py-2.5 text-sm text-brand-950">
                     Klaim disetujui. Jadwal serah terima akan dibuat oleh admin
@@ -154,18 +230,27 @@ export default function KlaimSayaPage() {
       {cancelling && (
         <ConfirmDialog
           title="Batalkan klaim?"
-          confirmLabel="Batalkan Klaim"
+          confirmLabel={cancelBusy ? "Membatalkan..." : "Batalkan Klaim"}
           danger
-          onConfirm={() => {
-            cancelClaim(cancelling.id);
-            setCancelling(null);
-          }}
+          onConfirm={() => void confirmCancel()}
           onCancel={() => setCancelling(null)}
         >
           <p>
-            Klaim {cancelling.id} akan dibatalkan. Anda masih bisa mengajukan
-            klaim baru untuk barang yang sama selama masih tersedia.
+            Klaim untuk barang {cancelling.item?.kode ?? "ini"} akan dibatalkan.
+            Anda masih bisa mengajukan klaim baru untuk barang yang sama selama
+            masih tersedia.
           </p>
+          <TextArea
+            label="Alasan pembatalan"
+            rows={3}
+            maxLength={MAX_CANCEL_REASON}
+            value={reason}
+            onChange={(e) => {
+              setReason(e.target.value);
+              setReasonError("");
+            }}
+            error={reasonError}
+          />
         </ConfirmDialog>
       )}
     </AppShell>

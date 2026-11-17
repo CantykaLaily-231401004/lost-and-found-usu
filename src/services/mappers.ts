@@ -258,6 +258,62 @@ export function claimRowToClaim(row: ClaimRow): Claim {
   };
 }
 
+export type MyClaimRow = {
+  claim_id: string;
+  found_id: string;
+  ciri_kepemilikan: string;
+  status: DbClaimStatus;
+  alasan: string | null;
+  tanggal_pengajuan: string;
+  decision_at: string | null;
+  found_reports: {
+    kode: string;
+    kategori: string;
+    kategori_lainnya: string | null;
+    deskripsi: string;
+    lokasi_temuan: string;
+  } | null;
+};
+
+export type MyClaim = {
+  id: string;
+  foundId: string;
+  evidence: string;
+  status: ClaimStatus;
+  reason?: string;
+  createdAt: string;
+  decidedAt?: string;
+  item: {
+    kode: string;
+    category: string;
+    categoryOther: string;
+    description: string;
+    location: string;
+  } | null;
+};
+
+export function myClaimRowToClaim(row: MyClaimRow): MyClaim {
+  const f = row.found_reports;
+  return {
+    id: row.claim_id,
+    foundId: row.found_id,
+    evidence: row.ciri_kepemilikan,
+    status: claimStatusFromDb(row.status),
+    reason: row.alasan ?? undefined,
+    createdAt: row.tanggal_pengajuan,
+    decidedAt: row.decision_at ?? undefined,
+    item: f
+      ? {
+          kode: f.kode,
+          category: f.kategori,
+          categoryOther: f.kategori_lainnya ?? "",
+          description: f.deskripsi,
+          location: f.lokasi_temuan,
+        }
+      : null,
+  };
+}
+
 export type NotificationRow = {
   notification_id: string;
   user_id: string;
@@ -269,6 +325,7 @@ export type NotificationRow = {
 
 /** Judul per `jenis` yang dikirim RPC lewat public.internal_notify. */
 const NOTIF_TITLES: Record<string, string> = {
+  klaim_baru: "Klaim Baru",
   klaim_disetujui: "Klaim Disetujui",
   klaim_ditolak: "Klaim Ditolak",
   klaim_dibatalkan: "Klaim Dibatalkan",

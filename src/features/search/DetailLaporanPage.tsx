@@ -175,7 +175,7 @@ export default function DetailLaporanPage() {
               <p className="text-center text-sm font-medium text-brand-800">Laporan Anda</p>
             ) : claimable ? (
               <Link
-                to={`/klaim/baru/${report.id}`}
+                to={`/klaim/baru/${report.kode}`}
                 className="flex h-10 items-center justify-center gap-2 rounded-lg bg-brand-800 text-sm font-medium text-white hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 focus-visible:ring-offset-2"
               >
                 <Icon name="clipboard" className="size-4" />
