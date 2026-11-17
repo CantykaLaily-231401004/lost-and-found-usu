@@ -34,7 +34,7 @@ export default function App() {
           <Route path="/cari/:kode" element={<DetailLaporanPage />} />
           <Route path="/laporan-saya" element={<LaporanSayaPage />} />
           <Route path="/klaim-saya" element={<KlaimSayaPage />} />
-          <Route path="/klaim/baru/:reportId" element={<AjukanKlaimPage />} />
+          <Route path="/klaim/baru/:kode" element={<AjukanKlaimPage />} />
           <Route path="/jadwal" element={<JadwalPage />} />
           <Route path="/notifikasi" element={<NotifikasiPage />} />
           <Route path="/akun" element={<AkunPage />} />

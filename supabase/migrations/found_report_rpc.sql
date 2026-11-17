@@ -347,12 +347,12 @@ exception
 end;
 $$;
 
-create or replace function public.rpc_close_found_report(p_found_id uuid, p_alasan text default null)
-returns jsonb
-language plpgsql
-security definer
-set search_path to ''
-as $$
+CREATE OR REPLACE FUNCTION public.rpc_close_found_report(p_found_id uuid, p_alasan text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
 declare
   v_uid      uuid := (select auth.uid());
   v_alasan   text := btrim(coalesce(p_alasan, ''));
@@ -386,4 +386,80 @@ begin
     return public.rpc_error('CONFLICT', 'Laporan ini sudah diserahkan atau ditutup.');
   end if;
   if public.has_active_claim(p_found_id) then
-    return public.rpc_error('CONFLICT', 'Masih ada klaim yang menunggu. Tolak atau batalkan klaim tersebut
+    return public.rpc_error('CONFLICT', 'Masih ada klaim yang menunggu. Tolak atau batalkan klaim tersebut terlebih dahulu.');
+  end if;
+
+  update public.found_reports set status = 'ditutup' where found_id = p_found_id;
+
+  insert into public.audit_records (actor_id, object_type, object_id, action, alasan)
+  values (v_uid, 'found_report', p_found_id, 'temuan_ditutup', v_alasan);
+
+  if not v_is_owner then
+    perform public.internal_notify(
+      v_found.user_id, 'status_temuan',
+      'Laporan temuan Anda ' || v_found.kode || ' ditutup oleh admin.'
+    );
+  end if;
+
+  return jsonb_build_object('ok', true, 'data', jsonb_build_object(
+    'found_id', p_found_id, 'status', 'ditutup'));
+end;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rpc_get_my_found_report_history()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_uid uuid := (select auth.uid());
+begin
+  if v_uid is null then
+    return public.rpc_error('UNAUTHORIZED', 'Sesi tidak valid. Silakan masuk kembali.');
+  end if;
+
+  return jsonb_build_object('ok', true, 'data', coalesce((
+    select jsonb_agg(jsonb_build_object(
+             'found_id', r.found_id, 'kode', r.kode, 'aksi', r.aksi, 'waktu', r.waktu, 'alasan', r.alasan)
+           order by r.waktu desc)
+    from (
+      select f.found_id, f.kode, 'dibuat'::text as aksi, f.created_at as waktu, null::text as alasan
+      from public.found_reports f
+      where f.user_id = v_uid
+      union all
+      select f.found_id, f.kode,
+             case a.action when 'temuan_diubah' then 'diubah'
+                           when 'temuan_ditutup' then 'ditutup'
+                           else a.action end,
+             a.occurred_at, a.alasan
+      from public.audit_records a
+      join public.found_reports f on f.found_id = a.object_id
+      where a.object_type = 'found_report' and f.user_id = v_uid
+    ) r
+  ), '[]'::jsonb));
+end;
+$function$
+;
+
+drop policy if exists photos_insert on public.photos;
+drop policy if exists photos_delete on public.photos;
+drop policy if exists rahasia_insert on public.data_rahasia;
+revoke insert, delete on table public.photos from authenticated;
+
+revoke all on function public.found_report_input_error(text, text, text, text, text, text, uuid, date, time, text[]) from public, anon, authenticated;
+
+revoke all on function public.rpc_create_found_report(uuid, uuid, text, text, text, date, text[], text, time, text, text, text[]) from public, anon, authenticated;
+grant execute on function public.rpc_create_found_report(uuid, uuid, text, text, text, date, text[], text, time, text, text, text[]) to authenticated;
+
+revoke all on function public.rpc_update_found_report(uuid, uuid, text, text, text, date, text[], text, time, text, text, text[], uuid[]) from public, anon, authenticated;
+grant execute on function public.rpc_update_found_report(uuid, uuid, text, text, text, date, text[], text, time, text, text, text[], uuid[]) to authenticated;
+
+revoke all on function public.rpc_close_found_report(uuid, text) from public, anon, authenticated;
+grant execute on function public.rpc_close_found_report(uuid, text) to authenticated;
+
+revoke all on function public.rpc_get_my_found_report_history() from public, anon, authenticated;
+grant execute on function public.rpc_get_my_found_report_history() to authenticated;
+
+commit;

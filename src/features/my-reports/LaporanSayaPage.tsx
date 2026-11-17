@@ -17,6 +17,7 @@ import { categoryLabel, type Report } from "../../shared/store/lofiStore";
 import { formatDate, formatDateTime } from "../../shared/utils/format";
 import { closeLostReport, listMyLostReports } from "../../services/lostReports";
 import { closeFoundReport, listMyFoundReports } from "../../services/foundReports";
+import { foundIdsWithActiveClaim } from "../../services/claims";
 import { errorMessage } from "../../services/rpc";
 
 const MIN_REASON = 10;
@@ -49,6 +50,7 @@ export default function LaporanSayaPage() {
   const [foundState, setFoundState] = useState<"loading" | "ready" | "error">("loading");
   
   const [openSecrets, setOpenSecrets] = useState<Set<string>>(() => new Set());
+  const [claimLocked, setClaimLocked] = useState<Set<string>>(() => new Set());
 
   const [reloadKey, setReloadKey] = useState(0);
   const userId = user?.id;
@@ -64,9 +66,13 @@ export default function LaporanSayaPage() {
       })
       .catch(() => active && setLostState("error"));
     listMyFoundReports(userId)
-      .then((list) => {
+      .then(async (list) => {
+        const locked = await foundIdsWithActiveClaim(
+          list.filter((r) => r.status === "Tersedia").map((r) => r.id),
+        );
         if (!active) return;
         setFoundReports(list);
+        setClaimLocked(locked);
         setFoundState("ready");
       })
       .catch(() => active && setFoundState("error"));
@@ -279,7 +285,13 @@ export default function LaporanSayaPage() {
                       Alasan ditutup: {r.closeReason}
                     </p>
                   )}
-                  {open && (
+                  {open && claimLocked.has(r.id) && (
+                    <p className="mt-2.5 rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+                      Ada klaim yang sedang diproses admin. Laporan belum dapat
+                      diubah atau ditutup. Hubungi admin area jika perlu.
+                    </p>
+                  )}
+                  {open && !claimLocked.has(r.id) && (
                     <div className="mt-2.5 flex items-center gap-2">
                       <Link to={editPath}>
                         <Button

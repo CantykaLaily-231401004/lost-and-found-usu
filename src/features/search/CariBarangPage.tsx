@@ -7,7 +7,8 @@ import Icon from "../../shared/components/Icon";
 import PageBanner from "../../shared/components/PageBanner";
 import Tabs from "../../shared/components/Tabs";
 import { useSessionUser } from "../../shared/hooks/useSessionUser";
-import { useLofiStore, type ReportStatus } from "../../shared/store/lofiStore";
+import type { ReportStatus } from "../../shared/store/lofiStore";
+import { listMyActiveClaimFoundIds } from "../../services/claims";
 import { CATEGORIES } from "../../shared/utils/reportOptions";
 import { fetchAreas, type Area } from "../../services/areas";
 import { errorMessage } from "../../services/rpc";
@@ -59,7 +60,19 @@ const PAGE_BUTTON_CLASS =
 
 export default function CariBarangPage() {
   const { user } = useSessionUser();
-  const store = useLofiStore();
+  const userId = user?.id;
+  const [claimedIds, setClaimedIds] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    listMyActiveClaimFoundIds(userId)
+      .then((ids) => active && setClaimedIds(ids))
+      .catch(() => active && setClaimedIds(new Set()));
+    return () => {
+      active = false;
+    };
+  }, [userId]);
 
   const [params, setParams] = useSearchParams();
   const tabParam = params.get("jenis");
@@ -312,12 +325,7 @@ export default function CariBarangPage() {
                   <ReportCard
                     report={r}
                     mine={r.mine}
-                    claimed={store.claims.some(
-                      (c) =>
-                        c.ownerId === user?.id &&
-                        c.reportId === r.id &&
-                        (c.status === "Menunggu" || c.status === "Disetujui"),
-                    )}
+                    claimed={claimedIds.has(r.id)}
                   />
                 </div>
               ))}

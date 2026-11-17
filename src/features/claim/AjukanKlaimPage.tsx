@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import AppShell from "../../shared/components/AppShell";
 import Alert from "../../shared/components/Alert";
@@ -16,13 +16,16 @@ import ReportThumb, {
 import Req from "../../shared/components/Req";
 import TextArea from "../../shared/components/TextArea";
 import { useSessionUser } from "../../shared/hooks/useSessionUser";
+import { categoryLabel } from "../../shared/store/lofiStore";
+import type { CatalogReport } from "../../services/mappers";
+import { errorMessage } from "../../services/rpc";
+import { getCatalogReport } from "../../services/search";
 import {
-  addClaim,
-  categoryLabel,
-  useLofiStore,
-} from "../../shared/store/lofiStore";
-
-const MIN_EVIDENCE = 30;
+  listMyActiveClaimFoundIds,
+  MAX_EVIDENCE,
+  MIN_EVIDENCE,
+  submitClaim,
+} from "../../services/claims";
 
 const GUIDE = [
   "Jelaskan ciri khas yang spesifik: nomor seri, isi di dalam, nama tertulis, atau tanda khusus.",
@@ -30,29 +33,81 @@ const GUIDE = [
   "Admin akan mencocokkan bukti Anda dengan ciri rahasia dari penemu.",
 ];
 
+type Loaded = {
+  key: string;
+  report: CatalogReport | null;
+  duplicate: boolean;
+  error: string;
+};
+
 export default function AjukanKlaimPage() {
-  const { reportId } = useParams();
+  const { kode = "" } = useParams();
   const navigate = useNavigate();
   const { user } = useSessionUser();
-  const store = useLofiStore();
+  const userId = user?.id;
   const [evidence, setEvidence] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
 
-  const report = store.reports.find((r) => r.id === reportId);
-  const duplicate = store.claims.some(
-    (c) =>
-      c.ownerId === user?.id &&
-      c.reportId === reportId &&
-      (c.status === "Menunggu" || c.status === "Disetujui"),
-  );
+  const requestKey = `${kode}|${userId}|${reloadKey}`;
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    Promise.all([getCatalogReport(kode), listMyActiveClaimFoundIds(userId)])
+      .then(([report, activeIds]) => {
+        if (!active) return;
+        setLoaded({
+          key: requestKey,
+          report,
+          duplicate: !!report && activeIds.has(report.id),
+          error: "",
+        });
+      })
+      .catch((e) => {
+        if (active)
+          setLoaded({ key: requestKey, report: null, duplicate: false, error: errorMessage(e) });
+      });
+    return () => {
+      active = false;
+    };
+  }, [kode, userId, requestKey]);
+
+  if (!loaded || loaded.key !== requestKey) {
+    return (
+      <AppShell>
+        <p className="text-sm text-gray-500">Memuat barang...</p>
+      </AppShell>
+    );
+  }
+
+  if (loaded.error) {
+    return (
+      <AppShell>
+        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+          {loaded.error}{" "}
+          <button
+            type="button"
+            onClick={() => setReloadKey((k) => k + 1)}
+            className="font-medium underline"
+          >
+            Coba lagi
+          </button>
+        </p>
+      </AppShell>
+    );
+  }
+
+  const report = loaded.report;
+  const duplicate = loaded.duplicate;
   const claimable =
     report &&
     report.kind === "found" &&
     report.status === "Tersedia" &&
-    report.ownerId !== user?.id;
+    !report.mine;
 
-  if (!claimable || duplicate) {
+  if (!report || !claimable || duplicate) {
     return (
       <AppShell>
         <EmptyState
@@ -83,13 +138,18 @@ export default function AjukanKlaimPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (loading || !report) return;
     if (evidence.trim().length < MIN_EVIDENCE)
       return setError(`Bukti minimal ${MIN_EVIDENCE} karakter.`);
     setError("");
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 900));
-    addClaim(report!.id, evidence, user!.id);
-    navigate("/klaim-saya");
+    try {
+      await submitClaim(report.id, evidence);
+      navigate("/klaim-saya");
+    } catch (err) {
+      setError(errorMessage(err));
+      setLoading(false);
+    }
   }
 
   const count = evidence.trim().length;
@@ -120,7 +180,7 @@ export default function AjukanKlaimPage() {
                 <div className="flex items-center gap-2">
                   <ReportKindBadge kind="found" />
                   <span className="font-mono text-xs text-gray-500">
-                    {report.id}
+                    {report.kode}
                   </span>
                 </div>
                 <p className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-gray-900">
@@ -165,6 +225,7 @@ export default function AjukanKlaimPage() {
                 placeholder="Cth: Dompet saya berisi KTM atas nama saya, ada foto keluarga di slot foto kanan, dan uang tunai sekitar Rp150.000..."
                 rows={6}
                 minChars={MIN_EVIDENCE}
+                maxLength={MAX_EVIDENCE}
                 value={evidence}
                 onChange={(e) => {
                   setEvidence(e.target.value);
