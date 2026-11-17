@@ -334,11 +334,17 @@ const NOTIF_TITLES: Record<string, string> = {
   jadwal_diubah: "Jadwal Serah Terima Diubah",
   jadwal_dibatalkan: "Jadwal Serah Terima Dibatalkan",
   serah_terima_selesai: "Serah Terima Selesai",
+  jadwal_diajukan: "Pengajuan Pengambilan Barang",
+  konfirmasi_diperlukan: "Konfirmasi Diperlukan",
 };
 
 function notifType(jenis: string): NotifType {
   if (jenis.startsWith("klaim_")) return "Klaim";
-  if (jenis.startsWith("jadwal_") || jenis === "serah_terima_selesai")
+  if (
+    jenis.startsWith("jadwal_") ||
+    jenis === "serah_terima_selesai" ||
+    jenis === "konfirmasi_diperlukan"
+  )
     return "Jadwal";
   if (jenis === "status_temuan" || jenis.startsWith("laporan_"))
     return "Laporan";
@@ -354,5 +360,118 @@ export function notificationRowToNotif(row: NotificationRow): Notif {
     body: row.pesan,
     createdAt: row.created_at,
     read: row.status_baca,
+  };
+}
+
+export type DbPickupStatus = "diajukan" | "terjadwal" | "dibatalkan" | "selesai";
+export type PickupStatus =
+  | "Menunggu Persetujuan"
+  | "Terjadwal"
+  | "Dibatalkan"
+  | "Selesai";
+
+const PICKUP_STATUS: Record<DbPickupStatus, PickupStatus> = {
+  diajukan: "Menunggu Persetujuan",
+  terjadwal: "Terjadwal",
+  dibatalkan: "Dibatalkan",
+  selesai: "Selesai",
+};
+
+export type MyScheduleRow = {
+  schedule_id: string;
+  claim_id: string;
+  status: DbPickupStatus;
+  waktu: string;
+  lokasi: string | null;
+  catatan: string | null;
+  catatan_pemohon: string | null;
+  alasan_batal: string | null;
+  penanggung_jawab: string | null;
+  nama_area: string;
+  konfirmasi_pemilik_at: string | null;
+  konfirmasi_penyerah_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  kode: string;
+  kategori: string;
+  kategori_lainnya: string | null;
+};
+
+export type PendingPickupRow = {
+  claim_id: string;
+  kode: string;
+  kategori: string;
+  kategori_lainnya: string | null;
+  nama_area: string;
+  decision_at: string | null;
+};
+
+export type MySchedulesRaw = {
+  jadwal: MyScheduleRow[];
+  perlu_jadwal: PendingPickupRow[];
+  klaim_menunggu: number;
+};
+
+export type MySchedule = {
+  id: string;
+  claimId: string;
+  status: PickupStatus;
+  at: string;
+  place: string;
+  note: string;
+  requestNote: string;
+  cancelReason: string;
+  officer: string;
+  area: string;
+  ownerConfirmedAt?: string;
+  officerConfirmedAt?: string;
+  completedAt?: string;
+  kode: string;
+  category: string;
+  categoryOther: string;
+};
+
+export type PendingPickup = {
+  claimId: string;
+  kode: string;
+  category: string;
+  categoryOther: string;
+  area: string;
+};
+
+export type MySchedulesData = {
+  schedules: MySchedule[];
+  pending: PendingPickup[];
+  waitingClaims: number;
+};
+
+export function mySchedulesFromRpc(raw: MySchedulesRaw): MySchedulesData {
+  return {
+    schedules: raw.jadwal.map((r) => ({
+      id: r.schedule_id,
+      claimId: r.claim_id,
+      status: PICKUP_STATUS[r.status],
+      at: r.waktu,
+      place: r.lokasi ?? "",
+      note: r.catatan ?? "",
+      requestNote: r.catatan_pemohon ?? "",
+      cancelReason: r.alasan_batal ?? "",
+      officer: r.penanggung_jawab ?? "",
+      area: r.nama_area,
+      ownerConfirmedAt: r.konfirmasi_pemilik_at ?? undefined,
+      officerConfirmedAt: r.konfirmasi_penyerah_at ?? undefined,
+      completedAt: r.completed_at ?? undefined,
+      kode: r.kode,
+      category: r.kategori,
+      categoryOther: r.kategori_lainnya ?? "",
+    })),
+    pending: raw.perlu_jadwal.map((r) => ({
+      claimId: r.claim_id,
+      kode: r.kode,
+      category: r.kategori,
+      categoryOther: r.kategori_lainnya ?? "",
+      area: r.nama_area,
+    })),
+    waitingClaims: Number(raw.klaim_menunggu) || 0,
   };
 }
