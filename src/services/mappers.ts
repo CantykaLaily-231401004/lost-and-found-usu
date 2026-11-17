@@ -5,11 +5,10 @@ import type {
   Notif,
   NotifType,
   Report,
+  ReportKind,
   ReportStatus,
   ScheduleStatus,
 } from "../shared/store/lofiStore";
-
-/* ---------- status: huruf kecil di database, huruf kapital di halaman ---------- */
 
 export type DbReportStatus =
   | "aktif"
@@ -44,11 +43,8 @@ export const scheduleStatusFromDb = (s: DbScheduleStatus) =>
 export const scheduleStatusToDb = (s: ScheduleStatus) =>
   s.toLowerCase() as DbScheduleStatus;
 
-/* ---------- kategori: 2 field di halaman, 1 kolom `kategori` di database ---------- */
-
 const OTHER_PREFIX = `${OTHER_CATEGORY}: `;
 
-/** { category: "Lainnya", categoryOther: "Tumbler" } -> "Lainnya: Tumbler" */
 export function categoryToDb(category: string, categoryOther: string): string {
   const other = categoryOther.trim();
   return category === OTHER_CATEGORY && other
@@ -56,7 +52,6 @@ export function categoryToDb(category: string, categoryOther: string): string {
     : category;
 }
 
-/** "Lainnya: Tumbler" -> { category: "Lainnya", categoryOther: "Tumbler" } */
 export function categoryFromDb(kategori: string): {
   category: string;
   categoryOther: string;
@@ -69,9 +64,6 @@ export function categoryFromDb(kategori: string): {
     : { category: kategori, categoryOther: "" };
 }
 
-/* ---------- tanggal: date + time (WIB) di halaman, timestamptz di database ---------- */
-
-/** "2026-11-15" + "17:30" -> "2026-11-15T17:30:00+07:00". Jam kosong dianggap 00:00. */
 export function wibToTimestamp(date: string, time: string): string {
   return `${date}T${time || "00:00"}:00+07:00`;
 }
@@ -86,7 +78,6 @@ const wibParts = new Intl.DateTimeFormat("en-CA", {
   hourCycle: "h23",
 });
 
-/** "2026-11-15T10:30:00+00:00" -> { date: "2026-11-15", time: "17:30" } (WIB). */
 export function timestampToWib(iso: string): { date: string; time: string } {
   const p = Object.fromEntries(
     wibParts.formatToParts(new Date(iso)).map((x) => [x.type, x.value]),
@@ -94,7 +85,6 @@ export function timestampToWib(iso: string): { date: string; time: string } {
   return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
 }
 
-/* ---------- baris tabel -> tipe halaman ---------- */
 
 type AreaJoin = { areas?: { nama_area: string } | null };
 
@@ -132,7 +122,6 @@ export type FoundReportRow = AreaJoin & {
   status: DbReportStatus;
   created_at: string;
   photos?: { photo_id: string; storage_path: string }[];
-  /** Hanya terisi untuk pelapor dan admin berwenang (RLS rahasia_select); selain itu null. */
   data_rahasia?: { ciri_rahasia: string[] } | { ciri_rahasia: string[] }[] | null;
 };
 
@@ -190,6 +179,56 @@ export function foundRowToReport(
     createdAt: row.created_at,
     photos: photos.map((p) => photoUrl(p.storage_path)),
     photoIds: photos.map((p) => p.photo_id),
+  };
+}
+
+export type CatalogRow = {
+  id: string;
+  kode: string;
+  jenis: ReportKind;
+  kategori: string;
+  kategori_lainnya: string | null;
+  deskripsi: string;
+  warna: string | null;
+  merek: string | null;
+  area_id: string;
+  nama_area: string | null;
+  lokasi: string;
+  tanggal: string;
+  jam: string | null;
+  status: DbReportStatus;
+  created_at: string;
+  milik_saya: boolean;
+  foto: { photo_id: string; storage_path: string }[];
+};
+
+export type CatalogReport = Report & { mine: boolean };
+
+export function catalogRowToReport(
+  row: CatalogRow,
+  photoUrl: (path: string) => string = () => "",
+): CatalogReport {
+  return {
+    id: row.id,
+    kode: row.kode,
+    kind: row.jenis,
+    ownerId: "", 
+    category: row.kategori,
+    categoryOther: row.kategori_lainnya ?? "",
+    description: row.deskripsi,
+    color: row.warna ?? "",
+    brand: row.merek ?? "",
+    location: row.lokasi,
+    area: row.nama_area ?? "",
+    areaId: row.area_id,
+    date: row.tanggal,
+    time: row.jam?.slice(0, 5) ?? "",
+    secrets: [],
+    status: reportStatusFromDb(row.status),
+    createdAt: row.created_at,
+    photos: row.foto.map((p) => photoUrl(p.storage_path)),
+    photoIds: row.foto.map((p) => p.photo_id),
+    mine: row.milik_saya,
   };
 }
 

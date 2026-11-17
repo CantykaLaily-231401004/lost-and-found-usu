@@ -5,6 +5,7 @@ import RegisterPage from "./features/auth/RegisterPage";
 import LostReportPage from "./features/lost-report/LostReportPage";
 import FoundReportPage from "./features/found-report/FoundReportPage";
 import CariBarangPage from "./features/search/CariBarangPage";
+import DetailLaporanPage from "./features/search/DetailLaporanPage";
 import LaporanSayaPage from "./features/my-reports/LaporanSayaPage";
 import AjukanKlaimPage from "./features/claim/AjukanKlaimPage";
 import KlaimSayaPage from "./features/claim/KlaimSayaPage";
@@ -30,6 +31,7 @@ export default function App() {
         {/* Halaman aplikasi: hanya untuk pengguna yang sudah masuk. */}
         <Route element={<RequireAuth />}>
           <Route path="/cari" element={<CariBarangPage />} />
+          <Route path="/cari/:kode" element={<DetailLaporanPage />} />
           <Route path="/laporan-saya" element={<LaporanSayaPage />} />
           <Route path="/klaim-saya" element={<KlaimSayaPage />} />
           <Route path="/klaim/baru/:reportId" element={<AjukanKlaimPage />} />

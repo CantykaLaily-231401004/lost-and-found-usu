@@ -31,6 +31,9 @@ const paths = {
   box: "M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8",
   plus: "M12 5v14M5 12h14",
   logout: "M9 4H5v16h4M16 8l4 4-4 4M20 12H9",
+  refresh: "M20 11a8 8 0 10-2.3 5.7M20 4v7h-7",
+  chevronLeft: "M15 6l-6 6 6 6",
+  chevronRight: "M9 6l6 6-6 6",
 } as const;
 
 export type IconName = keyof typeof paths;
