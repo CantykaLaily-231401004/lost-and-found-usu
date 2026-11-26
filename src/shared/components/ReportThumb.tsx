@@ -33,13 +33,16 @@ export default function ReportThumb({
 const STATUS_TONE: Record<string, BadgeTone> = {
   Tersedia: "green",
   Aktif: "outline",
+  Menunggu: "amber",
   Dicadangkan: "amber",
   Diserahkan: "gray",
   Ditutup: "graySoft",
 };
 
 export function ReportStatusBadge({ status }: { status: string }) {
-  return <Badge tone={STATUS_TONE[status] ?? "graySoft"}>{status}</Badge>;
+  return <Badge tone={STATUS_TONE[status] ?? "graySoft"}>
+      {status === "Menunggu" ? "Menunggu Penyerahan" : status}
+    </Badge>;
 }
 
 export function ReportKindBadge({

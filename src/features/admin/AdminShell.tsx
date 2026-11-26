@@ -4,7 +4,7 @@ import AppShell from "../../shared/components/AppShell";
 import Button from "../../shared/components/Button";
 import EmptyState from "../../shared/components/EmptyState";
 import Icon, { type IconName } from "../../shared/components/Icon";
-import { setDemoAdmin, useAdminSession } from "../../shared/hooks/useIsAdmin";
+import { useAdminState } from "../../shared/hooks/useIsAdmin";
 import { useSessionUser } from "../../shared/hooks/useSessionUser";
 import { supabase } from "../../services/supabase";
 
@@ -31,10 +31,10 @@ const NAV: {
     icon: "clipboard",
   },
   {
-    to: "/admin/jadwal",
-    label: "Jadwal Serah Terima",
-    short: "Jadwal",
-    icon: "calendar",
+    to: "/admin/pengambilan",
+    label: "Penerimaan dan Pengambilan",
+    short: "Barang",
+    icon: "box",
   },
   {
     to: "/admin/riwayat",
@@ -54,7 +54,17 @@ const NAV: {
 export default function AdminShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const { user } = useSessionUser();
-  const session = useAdminSession();
+  const { session, ready } = useAdminState();
+
+  if (!ready) {
+    return (
+      <AppShell>
+        <p className="py-12 text-center text-sm text-gray-500">
+          Memeriksa akses admin...
+        </p>
+      </AppShell>
+    );
+  }
 
   if (!session) {
     return (
@@ -62,29 +72,17 @@ export default function AdminShell({ children }: { children: ReactNode }) {
         <EmptyState
           icon="lock"
           title="Khusus admin"
-          body="Halaman ini untuk admin pusat dan admin fakultas. Untuk uji coba sebelum backend siap, pilih peran demo di bawah."
+          body="Halaman ini hanya dapat diakses oleh admin pusat dan admin fakultas."
           action={
-            <div className="flex flex-wrap justify-center gap-2">
-              <Button
-                type="button"
-                onClick={() =>
-                  setDemoAdmin({ role: "pusat", faculty: "Area Umum Kampus" })
-                }
-                className="h-9! w-auto! px-4! text-[13px]!"
-              >
-                Admin Pusat (demo)
-              </Button>
+            <Link to="/cari">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() =>
-                  setDemoAdmin({ role: "fakultas", faculty: "Fasilkom-TI" })
-                }
                 className="h-9! w-auto! px-4! text-[13px]!"
               >
-                Admin Fasilkom-TI (demo)
+                Kembali ke Cari Barang
               </Button>
-            </div>
+            </Link>
           }
         />
       </AppShell>
@@ -98,7 +96,6 @@ export default function AdminShell({ children }: { children: ReactNode }) {
       : `Admin Fakultas · ${session.faculty}`;
 
   async function signOut() {
-    setDemoAdmin(null);
     await supabase.auth.signOut();
     navigate("/", { replace: true });
   }
@@ -148,7 +145,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                   }`
                 }
               >
-                <Icon name={n.icon} className="size-[18px]" />
+                <Icon name={n.icon} className="size-[18px] shrink-0" />
                 {n.label}
               </NavLink>
             ))}
@@ -168,20 +165,10 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                 </span>
               </span>
             </div>
-            <div className="flex items-center justify-between px-1 text-xs text-white/60">
+            <div className="px-1 text-xs text-white/60">
               <Link to="/cari" className="hover:text-white">
                 Tampilan pengguna
               </Link>
-              <button
-                type="button"
-                onClick={() => {
-                  setDemoAdmin(null);
-                  navigate("/cari");
-                }}
-                className="hover:text-white"
-              >
-                Keluar mode admin
-              </button>
             </div>
           </div>
         </aside>

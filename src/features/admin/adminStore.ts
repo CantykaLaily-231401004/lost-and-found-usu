@@ -3,18 +3,17 @@ import { useSessionUser } from "../../shared/hooks/useSessionUser";
 import { useAdminSession, type AdminRole } from "../../shared/hooks/useIsAdmin";
 import {
   approveClaim,
-  cancelSchedule,
-  completeHandover,
-  createSchedule,
+  completePickup,
+  expireClaim,
+  receiveItem,
   rejectClaim,
   useLofiStore,
   type Claim,
   type Report,
-  type Schedule,
 } from "../../shared/store/lofiStore";
-import { formatDateTimeWIB, shorten } from "../../shared/utils/format";
+import { shorten } from "../../shared/utils/format";
 
-export type AuditType = "Klaim" | "Temuan" | "Jadwal" | "Admin";
+export type AuditType = "Klaim" | "Temuan" | "Pengambilan" | "Admin";
 export type AuditEntry = {
   id: string;
   at: string;
@@ -112,14 +111,11 @@ export function useScoped() {
     return {
       reports: [] as Report[],
       claims: [] as Claim[],
-      schedules: [] as Schedule[],
     };
   const reports = store.reports.filter((r) => inScope(s, r.area));
   const rIds = new Set(reports.map((r) => r.id));
   const claims = store.claims.filter((c) => rIds.has(c.reportId));
-  const cIds = new Set(claims.map((c) => c.id));
-  const schedules = store.schedules.filter((sc) => cIds.has(sc.claimId));
-  return { reports, claims, schedules };
+  return { reports, claims };
 }
 
 function log(
@@ -185,57 +181,48 @@ export function actReject(
   return true;
 }
 
-export function actCreateSchedule(
-  a: Actor,
-  claim: Claim,
-  report: Report | undefined,
-  input: { at: string; place: string; officer: string; note: string },
-): string | null {
-  const err = createSchedule(claim.id, input);
+export function actReceive(a: Actor, report: Report): string | null {
+  const err = receiveItem(report.id);
   if (err) return err;
   log(
     a,
-    "Jadwal",
-    "membuat jadwal serah terima",
+    "Pengambilan",
+    "menerima barang temuan",
+    describe(report.id, report.description),
+    "Barang diserahkan penemu kepada admin.",
+    report.area,
+  );
+  return null;
+}
+
+export function actPickup(
+  a: Actor,
+  claim: Claim,
+  report: Report | undefined,
+  code: string,
+  ktmChecked: boolean,
+): string | null {
+  const err = completePickup(claim.id, code, ktmChecked);
+  if (err) return err;
+  log(
+    a,
+    "Pengambilan",
+    "menyelesaikan pengambilan barang",
     describe(claim.id, report?.description),
-    `Jadwal: ${formatDateTimeWIB(new Date(input.at).toISOString())}, ${input.place.trim()}`,
+    "KTM dan kode pengambilan terverifikasi.",
     report?.area,
   );
   return null;
 }
 
-export function actCancelSchedule(
-  a: Actor,
-  sc: Schedule,
-  report: Report | undefined,
-  reason: string,
-) {
-  if (!cancelSchedule(sc.id, reason)) return false;
+export function actExpire(a: Actor, claim: Claim, report: Report | undefined) {
+  if (!expireClaim(claim.id)) return false;
   log(
     a,
-    "Jadwal",
-    "membatalkan jadwal",
-    describe(sc.id, sc.title),
-    reason.trim(),
-    report?.area,
-  );
-  return true;
-}
-
-export function actComplete(
-  a: Actor,
-  sc: Schedule,
-  report: Report | undefined,
-  owner: boolean,
-  giver: boolean,
-) {
-  if (!completeHandover(sc.id, owner, giver)) return false;
-  log(
-    a,
-    "Jadwal",
-    "menyelesaikan serah terima",
-    describe(sc.id, sc.title),
-    "Pemilik dan penyerah sudah mengonfirmasi.",
+    "Pengambilan",
+    "membatalkan klaim karena batas ambil terlewat",
+    describe(claim.id, report?.description),
+    undefined,
     report?.area,
   );
   return true;

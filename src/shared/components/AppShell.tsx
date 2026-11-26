@@ -10,7 +10,6 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: "/cari", label: "Cari Barang", icon: "search" },
   { to: "/laporan-saya", label: "Laporan Saya", icon: "file" },
   { to: "/klaim-saya", label: "Klaim Saya", icon: "clipboard" },
-  { to: "/jadwal", label: "Jadwal", icon: "calendar" },
   { to: "/notifikasi", label: "Notifikasi", icon: "bell" },
   { to: "/akun", label: "Akun", icon: "user" },
 ];

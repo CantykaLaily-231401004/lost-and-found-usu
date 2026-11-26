@@ -7,11 +7,11 @@ import type {
   Report,
   ReportKind,
   ReportStatus,
-  ScheduleStatus,
 } from "../shared/store/lofiStore";
 
 export type DbReportStatus =
   | "aktif"
+  | "menunggu"
   | "tersedia"
   | "dicadangkan"
   | "diserahkan"
@@ -22,7 +22,6 @@ export type DbClaimStatus =
   | "ditolak"
   | "dibatalkan"
   | "selesai";
-export type DbScheduleStatus = "terjadwal" | "dibatalkan" | "selesai";
 
 function capitalize<T extends string>(s: string): T {
   return (s.charAt(0).toUpperCase() + s.slice(1)) as T;
@@ -35,13 +34,28 @@ export const reportStatusToDb = (s: ReportStatus) =>
 
 export const claimStatusFromDb = (s: DbClaimStatus) =>
   capitalize<ClaimStatus>(s);
-export const claimStatusToDb = (s: ClaimStatus) =>
+export const claimStatusToDb = (s: DbClaimStatus) =>
   s.toLowerCase() as DbClaimStatus;
 
-export const scheduleStatusFromDb = (s: DbScheduleStatus) =>
-  capitalize<ScheduleStatus>(s);
-export const scheduleStatusToDb = (s: ScheduleStatus) =>
-  s.toLowerCase() as DbScheduleStatus;
+/** Menentukan titik serah terima/pengambilan berdasarkan area fakultas atau umum. */
+export function handoverPointLabel(
+  areaName?: string,
+  areaKind?: string,
+): string {
+  const name = areaName?.trim();
+  if (!name) return "TU fakultas atau Pos Layanan Admin Pusat";
+
+  const isGeneral =
+    areaKind === "umum" ||
+    /umum|perpustakaan|rektor|auditorium|stadion|panca budi|rumah sakit|rs usu/i.test(
+      name,
+    );
+
+  if (isGeneral) {
+    return `Pos Layanan Admin Pusat (Biro Rektor / Pusat Layanan Terpadu USU) — cakupan ${name}`;
+  }
+  return `TU / Admin ${name}`;
+}
 
 const OTHER_PREFIX = `${OTHER_CATEGORY}: `;
 
@@ -82,9 +96,11 @@ export function timestampToWib(iso: string): { date: string; time: string } {
   const p = Object.fromEntries(
     wibParts.formatToParts(new Date(iso)).map((x) => [x.type, x.value]),
   );
-  return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
+  return {
+    date: `${p.year}-${p.month}-${p.day}`,
+    time: `${p.hour}:${p.minute}`,
+  };
 }
-
 
 type AreaJoin = { areas?: { nama_area: string } | null };
 
@@ -122,7 +138,10 @@ export type FoundReportRow = AreaJoin & {
   status: DbReportStatus;
   created_at: string;
   photos?: { photo_id: string; storage_path: string }[];
-  data_rahasia?: { ciri_rahasia: string[] } | { ciri_rahasia: string[] }[] | null;
+  data_rahasia?:
+    | { ciri_rahasia: string[] }
+    | { ciri_rahasia: string[] }[]
+    | null;
 };
 
 export function lostRowToReport(
@@ -158,7 +177,9 @@ export function foundRowToReport(
   photoUrl: (path: string) => string = () => "",
 ): Report {
   const photos = row.photos ?? [];
-  const rahasia = Array.isArray(row.data_rahasia) ? row.data_rahasia[0] : row.data_rahasia;
+  const rahasia = Array.isArray(row.data_rahasia)
+    ? row.data_rahasia[0]
+    : row.data_rahasia;
   return {
     id: row.found_id,
     kode: row.kode,
@@ -212,7 +233,7 @@ export function catalogRowToReport(
     id: row.id,
     kode: row.kode,
     kind: row.jenis,
-    ownerId: "", 
+    ownerId: "",
     category: row.kategori,
     categoryOther: row.kategori_lainnya ?? "",
     description: row.deskripsi,
@@ -266,12 +287,19 @@ export type MyClaimRow = {
   alasan: string | null;
   tanggal_pengajuan: string;
   decision_at: string | null;
+  kode_pengambilan?: string | null;
+  batas_ambil_at?: string | null;
+  diserahkan_at?: string | null;
   found_reports: {
     kode: string;
     kategori: string;
     kategori_lainnya: string | null;
     deskripsi: string;
     lokasi_temuan: string;
+    areas?: {
+      nama_area: string;
+      jenis_area?: string;
+    } | null;
   } | null;
 };
 
@@ -283,12 +311,17 @@ export type MyClaim = {
   reason?: string;
   createdAt: string;
   decidedAt?: string;
+  pickupCode?: string;
+  pickupDeadline?: string;
+  handedOverAt?: string;
   item: {
     kode: string;
     category: string;
     categoryOther: string;
     description: string;
     location: string;
+    areaName?: string;
+    areaKind?: string;
   } | null;
 };
 
@@ -302,6 +335,9 @@ export function myClaimRowToClaim(row: MyClaimRow): MyClaim {
     reason: row.alasan ?? undefined,
     createdAt: row.tanggal_pengajuan,
     decidedAt: row.decision_at ?? undefined,
+    pickupCode: row.kode_pengambilan ?? undefined,
+    pickupDeadline: row.batas_ambil_at ?? undefined,
+    handedOverAt: row.diserahkan_at ?? undefined,
     item: f
       ? {
           kode: f.kode,
@@ -309,6 +345,8 @@ export function myClaimRowToClaim(row: MyClaimRow): MyClaim {
           categoryOther: f.kategori_lainnya ?? "",
           description: f.deskripsi,
           location: f.lokasi_temuan,
+          areaName: f.areas?.nama_area,
+          areaKind: f.areas?.jenis_area,
         }
       : null,
   };
@@ -329,23 +367,23 @@ const NOTIF_TITLES: Record<string, string> = {
   klaim_disetujui: "Klaim Disetujui",
   klaim_ditolak: "Klaim Ditolak",
   klaim_dibatalkan: "Klaim Dibatalkan",
+  klaim_selesai: "Barang Telah Diambil",
+  kode_pengambilan: "Kode Pengambilan Diperbarui",
   status_temuan: "Status Laporan Temuan",
-  jadwal_dibuat: "Jadwal Serah Terima",
-  jadwal_diubah: "Jadwal Serah Terima Diubah",
-  jadwal_dibatalkan: "Jadwal Serah Terima Dibatalkan",
-  serah_terima_selesai: "Serah Terima Selesai",
-  jadwal_diajukan: "Pengajuan Pengambilan Barang",
-  konfirmasi_diperlukan: "Konfirmasi Diperlukan",
+  barang_diterima: "Barang Diterima Admin",
+  pengambilan_selesai: "Barang Telah Diambil",
+  serah_terima_selesai: "Barang Telah Diambil",
 };
 
 function notifType(jenis: string): NotifType {
-  if (jenis.startsWith("klaim_")) return "Klaim";
   if (
-    jenis.startsWith("jadwal_") ||
-    jenis === "serah_terima_selesai" ||
-    jenis === "konfirmasi_diperlukan"
+    jenis === "klaim_selesai" ||
+    jenis === "kode_pengambilan" ||
+    jenis === "pengambilan_selesai" ||
+    jenis === "serah_terima_selesai"
   )
-    return "Jadwal";
+    return "Pengambilan";
+  if (jenis.startsWith("klaim_")) return "Klaim";
   if (jenis === "status_temuan" || jenis.startsWith("laporan_"))
     return "Laporan";
   return "Sistem";
@@ -360,118 +398,5 @@ export function notificationRowToNotif(row: NotificationRow): Notif {
     body: row.pesan,
     createdAt: row.created_at,
     read: row.status_baca,
-  };
-}
-
-export type DbPickupStatus = "diajukan" | "terjadwal" | "dibatalkan" | "selesai";
-export type PickupStatus =
-  | "Menunggu Persetujuan"
-  | "Terjadwal"
-  | "Dibatalkan"
-  | "Selesai";
-
-const PICKUP_STATUS: Record<DbPickupStatus, PickupStatus> = {
-  diajukan: "Menunggu Persetujuan",
-  terjadwal: "Terjadwal",
-  dibatalkan: "Dibatalkan",
-  selesai: "Selesai",
-};
-
-export type MyScheduleRow = {
-  schedule_id: string;
-  claim_id: string;
-  status: DbPickupStatus;
-  waktu: string;
-  lokasi: string | null;
-  catatan: string | null;
-  catatan_pemohon: string | null;
-  alasan_batal: string | null;
-  penanggung_jawab: string | null;
-  nama_area: string;
-  konfirmasi_pemilik_at: string | null;
-  konfirmasi_penyerah_at: string | null;
-  completed_at: string | null;
-  created_at: string;
-  kode: string;
-  kategori: string;
-  kategori_lainnya: string | null;
-};
-
-export type PendingPickupRow = {
-  claim_id: string;
-  kode: string;
-  kategori: string;
-  kategori_lainnya: string | null;
-  nama_area: string;
-  decision_at: string | null;
-};
-
-export type MySchedulesRaw = {
-  jadwal: MyScheduleRow[];
-  perlu_jadwal: PendingPickupRow[];
-  klaim_menunggu: number;
-};
-
-export type MySchedule = {
-  id: string;
-  claimId: string;
-  status: PickupStatus;
-  at: string;
-  place: string;
-  note: string;
-  requestNote: string;
-  cancelReason: string;
-  officer: string;
-  area: string;
-  ownerConfirmedAt?: string;
-  officerConfirmedAt?: string;
-  completedAt?: string;
-  kode: string;
-  category: string;
-  categoryOther: string;
-};
-
-export type PendingPickup = {
-  claimId: string;
-  kode: string;
-  category: string;
-  categoryOther: string;
-  area: string;
-};
-
-export type MySchedulesData = {
-  schedules: MySchedule[];
-  pending: PendingPickup[];
-  waitingClaims: number;
-};
-
-export function mySchedulesFromRpc(raw: MySchedulesRaw): MySchedulesData {
-  return {
-    schedules: raw.jadwal.map((r) => ({
-      id: r.schedule_id,
-      claimId: r.claim_id,
-      status: PICKUP_STATUS[r.status],
-      at: r.waktu,
-      place: r.lokasi ?? "",
-      note: r.catatan ?? "",
-      requestNote: r.catatan_pemohon ?? "",
-      cancelReason: r.alasan_batal ?? "",
-      officer: r.penanggung_jawab ?? "",
-      area: r.nama_area,
-      ownerConfirmedAt: r.konfirmasi_pemilik_at ?? undefined,
-      officerConfirmedAt: r.konfirmasi_penyerah_at ?? undefined,
-      completedAt: r.completed_at ?? undefined,
-      kode: r.kode,
-      category: r.kategori,
-      categoryOther: r.kategori_lainnya ?? "",
-    })),
-    pending: raw.perlu_jadwal.map((r) => ({
-      claimId: r.claim_id,
-      kode: r.kode,
-      category: r.kategori,
-      categoryOther: r.kategori_lainnya ?? "",
-      area: r.nama_area,
-    })),
-    waitingClaims: Number(raw.klaim_menunggu) || 0,
   };
 }

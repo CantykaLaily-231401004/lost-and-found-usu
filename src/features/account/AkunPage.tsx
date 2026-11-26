@@ -49,8 +49,8 @@ export default function AkunPage() {
       dot: "bg-tag",
     },
     {
-      n: store.schedules.filter((s) => s.ownerId === id).length,
-      label: "Jadwal",
+      n: store.claims.filter((c) => c.ownerId === id && c.status === "Selesai").length,
+      label: "Diambil",
       dot: "bg-brand-950",
     },
   ];
