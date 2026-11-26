@@ -373,6 +373,7 @@ const NOTIF_TITLES: Record<string, string> = {
   barang_diterima: "Barang Diterima Admin",
   pengambilan_selesai: "Barang Telah Diambil",
   serah_terima_selesai: "Barang Telah Diambil",
+  peran_admin: "Peran Admin",
 };
 
 function notifType(jenis: string): NotifType {

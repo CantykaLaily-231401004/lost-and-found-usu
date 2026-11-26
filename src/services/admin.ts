@@ -188,3 +188,62 @@ export function listAdminAudit(params?: { areaId?: string; page?: number }) {
     p_halaman: params?.page ?? 1,
   });
 }
+
+export type AdminAssignmentItem = {
+  assignment_id: string;
+  area_id: string;
+  nama_area: string;
+  status: "aktif" | "dicabut";
+  assigned_at: string;
+  revoked_at: string | null;
+};
+
+export type AdminAccountItem = {
+  user_id: string;
+  nama: string;
+  email: string;
+  role: "admin_pusat" | "admin_fakultas";
+  terverifikasi: boolean;
+  penugasan: AdminAssignmentItem[];
+};
+
+export type AssignFacultyResult = {
+  assignment_id: string;
+  user_id: string;
+  email: string;
+  nama: string;
+  area_id: string;
+  nama_area: string;
+  duplikat: boolean;
+};
+
+export type RevokeFacultyResult = {
+  assignment_id: string;
+  status: "dicabut";
+  peran_akun: string;
+  duplikat: boolean;
+};
+
+export function listAdminAccounts(): Promise<{ items: AdminAccountItem[] }> {
+  return callRpc<{ items: AdminAccountItem[] }>("rpc_admin_list_accounts");
+}
+
+export function assignFacultyAdmin(
+  email: string,
+  areaId: string,
+): Promise<AssignFacultyResult> {
+  return callRpc<AssignFacultyResult>("rpc_admin_assign_faculty", {
+    p_email: email,
+    p_area_id: areaId,
+  });
+}
+
+export function revokeFacultyAdmin(
+  assignmentId: string,
+  alasan: string,
+): Promise<RevokeFacultyResult> {
+  return callRpc<RevokeFacultyResult>("rpc_admin_revoke_faculty", {
+    p_assignment_id: assignmentId,
+    p_alasan: alasan,
+  });
+}
