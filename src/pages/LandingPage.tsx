@@ -16,7 +16,7 @@ const steps = [
   },
   {
     title: "Klaim dan ambil",
-    body: "Pemilik membuktikan kepemilikan lewat ciri yang hanya ia ketahui, lalu admin menjadwalkan serah terima.",
+    body: "Pemilik membuktikan kepemilikan lewat ciri yang hanya ia ketahui, lalu mengambil barang di TU fakultas atau Pos Layanan Admin Pusat dengan KTM dan kode pengambilan.",
   },
 ];
 

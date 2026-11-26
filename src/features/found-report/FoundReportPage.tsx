@@ -88,7 +88,9 @@ function validateSecrets(secrets: string[]): string[] {
 function secretSlotFromMessage(secrets: string[], message: string): number {
   const n = Number(/ke-(\d+)/.exec(message)?.[1] ?? 0);
   if (!n) return 0;
-  const filled = secrets.map((s, i) => (s.trim() ? i : -1)).filter((i) => i >= 0);
+  const filled = secrets
+    .map((s, i) => (s.trim() ? i : -1))
+    .filter((i) => i >= 0);
   return filled[n - 1] ?? 0;
 }
 
@@ -133,10 +135,14 @@ function FoundReportForm({
 
   const [areas, setAreas] = useState<Area[]>([]);
   const [existing, setExisting] = useState<Report | null>(null);
-  const [loadState, setLoadState] = useState<"loading" | "ready" | "missing" | "error">("loading");
+  const [loadState, setLoadState] = useState<
+    "loading" | "ready" | "missing" | "error"
+  >("loading");
   const [step, setStep] = useState(0);
   const [values, setValues] = useState<ReportValues>(emptyReport);
-  const [secrets, setSecrets] = useState<string[]>(() => Array(SECRET_SLOTS).fill(""));
+  const [secrets, setSecrets] = useState<string[]>(() =>
+    Array(SECRET_SLOTS).fill(""),
+  );
   const [errors, setErrors] = useState<ReportErrors>({});
   const [secretErrors, setSecretErrors] = useState<string[]>([]);
   const [formError, setFormError] = useState("");
@@ -148,7 +154,10 @@ function FoundReportForm({
 
   useEffect(() => {
     let active = true;
-    Promise.all([fetchAreas(), editId ? getMyEditableFoundReport(editId, ownerId) : null])
+    Promise.all([
+      fetchAreas(),
+      editId ? getMyEditableFoundReport(editId, ownerId) : null,
+    ])
       .then(([list, report]) => {
         if (!active) return;
         setAreas(list);
@@ -212,7 +221,9 @@ function FoundReportForm({
     const folder = `${ownerId}/${existing ? existing.id : requestId}`;
     const photos = await Promise.all(
       values.photos.map(async (p) =>
-        p.file && !p.path ? { ...p, path: await uploadFoundPhoto(folder, p.file) } : p,
+        p.file && !p.path
+          ? { ...p, path: await uploadFoundPhoto(folder, p.file) }
+          : p,
       ),
     );
     setValues((v) => ({ ...v, photos }));
@@ -236,26 +247,45 @@ function FoundReportForm({
           photos = await uploadNewPhotos();
         } catch {
           setUploadFailed(true);
-          setFormError("Foto gagal diunggah. Coba kirim lagi, atau kirim laporan tanpa foto baru.");
+          setFormError(
+            "Foto gagal diunggah. Coba kirim lagi, atau kirim laporan tanpa foto baru.",
+          );
           return;
         }
       }
-      const newPaths = photos.filter((p) => p.file && p.path).map((p) => p.path as string);
+      const newPaths = photos
+        .filter((p) => p.file && p.path)
+        .map((p) => p.path as string);
       const input = toInput(current);
       if (existing) {
         const keptIds = new Set(photos.map((p) => p.id).filter(Boolean));
-        const removeIds = (existing.photoIds ?? []).filter((id) => !keptIds.has(id));
-        const res = await updateFoundReport(existing.id, input, secrets, newPaths, removeIds);
+        const removeIds = (existing.photoIds ?? []).filter(
+          (id) => !keptIds.has(id),
+        );
+        const res = await updateFoundReport(
+          existing.id,
+          input,
+          secrets,
+          newPaths,
+          removeIds,
+        );
         setDoneId(res.kode);
       } else {
-        const res = await createFoundReport(input, secrets, requestId, newPaths);
+        const res = await createFoundReport(
+          input,
+          secrets,
+          requestId,
+          newPaths,
+        );
         setDoneId(res.kode);
       }
     } catch (err) {
       const dbField = err instanceof ServiceError ? err.field : undefined;
       if (dbField === "ciri_rahasia") {
         const slot = secretSlotFromMessage(secrets, errorMessage(err));
-        setSecretErrors(secrets.map((_, i) => (i === slot ? errorMessage(err) : "")));
+        setSecretErrors(
+          secrets.map((_, i) => (i === slot ? errorMessage(err) : "")),
+        );
         goTo(1);
         requestAnimationFrame(() => focusFirstError(formRef.current));
       } else if (dbField && FIELD_FROM_DB[dbField]) {
@@ -264,7 +294,9 @@ function FoundReportForm({
         requestAnimationFrame(() => focusFirstError(formRef.current));
       } else {
         setFormError(
-          err instanceof ServiceError && err.code !== "UNKNOWN" && err.code !== "NETWORK"
+          err instanceof ServiceError &&
+            err.code !== "UNKNOWN" &&
+            err.code !== "NETWORK"
             ? err.message
             : "Laporan belum tersimpan dan belum diterbitkan. Periksa koneksi lalu coba lagi.",
         );
@@ -297,10 +329,14 @@ function FoundReportForm({
       <AppShell>
         <EmptyState
           icon="alert"
-          title={loadState === "missing" ? "Laporan tidak dapat diubah" : "Gagal memuat formulir"}
+          title={
+            loadState === "missing"
+              ? "Laporan tidak dapat diubah"
+              : "Gagal memuat formulir"
+          }
           body={
             loadState === "missing"
-              ? "Laporan hanya bisa diubah saat berstatus Tersedia dan belum ada klaim aktif. Jika perlu, hubungi admin."
+              ? "Laporan hanya bisa diubah saat masih menunggu penyerahan atau tersedia dan belum ada klaim aktif. Jika perlu, hubungi admin."
               : "Periksa koneksi Anda lalu muat ulang halaman."
           }
           action={
@@ -339,6 +375,7 @@ function FoundReportForm({
             id={doneId}
             kind="found"
             mode={existing ? "edit" : "create"}
+            area={areaName}
             onAgain={reset}
           />
         </div>
@@ -351,13 +388,19 @@ function FoundReportForm({
 
             <form ref={formRef} onSubmit={handleSubmit} noValidate>
               <FormCard>
-                <div hidden={step !== 0} className="border-b border-gray-200/80">
+                <div
+                  hidden={step !== 0}
+                  className="border-b border-gray-200/80"
+                >
                   <ReportFields
                     kind="found"
                     values={values}
                     errors={errors}
                     onChange={change}
-                    areaOptions={areas.map((a) => ({ value: a.id, label: a.name }))}
+                    areaOptions={areas.map((a) => ({
+                      value: a.id,
+                      label: a.name,
+                    }))}
                   />
                 </div>
 

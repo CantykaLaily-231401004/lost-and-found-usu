@@ -9,7 +9,18 @@ export const MAX_CANCEL_REASON = 1000;
 
 const SELECT =
   "claim_id, found_id, ciri_kepemilikan, status, alasan, tanggal_pengajuan, decision_at, " +
-  "found_reports(kode, kategori, kategori_lainnya, deskripsi, lokasi_temuan)";
+  "batas_ambil_at, diserahkan_at, " +
+  "found_reports(kode, kategori, kategori_lainnya, deskripsi, lokasi_temuan, areas(nama_area, jenis_area))";
+
+export async function getMyPickupCode(claimId: string) {
+  return callRpc<{
+    claim_id: string;
+    kode_barang: string;
+    kode_pengambilan: string;
+    batas_ambil_at: string;
+    kedaluwarsa: boolean;
+  }>("rpc_get_my_pickup_code", { p_claim_id: claimId });
+}
 
 export async function listMyClaims(userId: string): Promise<MyClaim[]> {
   const { data, error } = await supabase
@@ -18,10 +29,29 @@ export async function listMyClaims(userId: string): Promise<MyClaim[]> {
     .eq("user_id", userId)
     .order("tanggal_pengajuan", { ascending: false });
   if (error) throw toServiceError(error);
-  return (data as unknown as MyClaimRow[]).map(myClaimRowToClaim);
+
+  const claims = (data as unknown as MyClaimRow[]).map(myClaimRowToClaim);
+
+  // Ambil kode pengambilan 6 digit lewat RPC khusus untuk klaim yang disetujui
+  await Promise.all(
+    claims.map(async (c) => {
+      if (c.status !== "Disetujui") return;
+      try {
+        const res = await getMyPickupCode(c.id);
+        c.pickupCode = res.kode_pengambilan;
+        c.pickupDeadline = res.batas_ambil_at;
+      } catch {
+        // biarkan kosong jika gagal agar daftar klaim tetap tampil
+      }
+    }),
+  );
+
+  return claims;
 }
 
-export async function listMyActiveClaimFoundIds(userId: string): Promise<Set<string>> {
+export async function listMyActiveClaimFoundIds(
+  userId: string,
+): Promise<Set<string>> {
   const { data, error } = await supabase
     .from("claims")
     .select("found_id")
@@ -45,11 +75,15 @@ export async function cancelClaim(claimId: string, reason: string) {
   });
 }
 
-export async function foundIdsWithActiveClaim(foundIds: string[]): Promise<Set<string>> {
+export async function foundIdsWithActiveClaim(
+  foundIds: string[],
+): Promise<Set<string>> {
   const result = new Set<string>();
   await Promise.all(
     foundIds.map(async (id) => {
-      const { data, error } = await supabase.rpc("has_active_claim", { p_found_id: id });
+      const { data, error } = await supabase.rpc("has_active_claim", {
+        p_found_id: id,
+      });
       if (!error && data === true) result.add(id);
     }),
   );

@@ -32,7 +32,7 @@ const REASONS = [
 ] as const;
 
 function isOpen(r: Report) {
-  return r.status === "Aktif" || r.status === "Tersedia";
+  return r.status === "Aktif" || r.status === "Menunggu" || r.status === "Tersedia";
 }
 
 export default function LaporanSayaPage() {

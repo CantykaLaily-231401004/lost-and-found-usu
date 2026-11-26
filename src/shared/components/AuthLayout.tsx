@@ -8,7 +8,7 @@ const PHOTO_SRC = undefined as string | undefined;
 const steps = [
   "Laporkan barang hilang atau temuan",
   "Cari berdasarkan ciri dan lokasi",
-  "Klaim dengan ciri rahasia, lalu atur serah terima",
+  "Klaim dengan ciri rahasia, lalu ambil barang di TU fakultas atau Admin Pusat",
 ];
 
 export function Logo({ tone = "light" }: { tone?: "light" | "dark" }) {

@@ -18,11 +18,11 @@ type Tab = "semua" | NotifType;
 const ICON: Record<NotifType, IconName> = {
   Laporan: "file",
   Klaim: "clipboard",
-  Jadwal: "calendar",
+  Pengambilan: "box",
   Sistem: "info",
 };
 
-const TYPES: NotifType[] = ["Klaim", "Jadwal", "Laporan", "Sistem"];
+const TYPES: NotifType[] = ["Klaim", "Pengambilan", "Laporan", "Sistem"];
 
 export default function NotifikasiPage() {
   const { user } = useSessionUser();
@@ -75,7 +75,7 @@ export default function NotifikasiPage() {
           <EmptyState
             icon="bell"
             title="Belum ada notifikasi"
-            body="Pembaruan tentang laporan, klaim, dan jadwal serah terima Anda akan muncul di sini."
+            body="Pembaruan tentang laporan, klaim, dan pengambilan barang Anda akan muncul di sini."
           />
         ) : (
           shown.map((n) => (

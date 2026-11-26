@@ -1,19 +1,30 @@
 import { Link } from "react-router-dom";
 import Button from "./Button";
 import Icon from "./Icon";
+import { handoverPointLabel } from "../../services/mappers";
+import {
+  DEFAULT_WORKING_HOURS,
+  HANDOVER_DEADLINE_DAYS,
+} from "../utils/handover";
 
 export default function ReportSuccess({
   id,
   kind,
   mode = "create",
+  area,
+  areaKind,
   onAgain,
 }: {
   id: string;
   kind: "lost" | "found";
   mode?: "create" | "edit";
+  area?: string;
+  areaKind?: string;
   onAgain: () => void;
 }) {
   const lost = kind === "lost";
+  const dropoffPoint = handoverPointLabel(area, areaKind);
+
   const title =
     mode === "edit"
       ? "Perubahan tersimpan"
@@ -25,7 +36,7 @@ export default function ReportSuccess({
       ? "Perubahan Anda sudah disimpan dan tampil di katalog."
       : lost
         ? "Laporan Anda sudah aktif dan muncul di Laporan Saya serta katalog pencarian."
-        : "Terima kasih sudah melapor. Data katalog sudah terbit tanpa ciri rahasia dan kontak pribadi Anda.";
+        : `Terima kasih sudah melapor. Serahkan barang ke ${dropoffPoint} agar laporan tampil di katalog.`;
 
   const next =
     mode === "edit"
@@ -37,9 +48,9 @@ export default function ReportSuccess({
             "Cari juga di katalog, siapa tahu barang Anda sudah ditemukan orang lain.",
           ]
         : [
-            "Barang tampil di katalog tanpa ciri rahasia Anda.",
-            "Jika ada yang mengklaim, admin mencocokkan bukti dengan ciri rahasia dari Anda.",
-            "Jadwal serah terima akan muncul di menu Jadwal setelah klaim disetujui.",
+            `Serahkan barang ke ${dropoffPoint} dalam ${HANDOVER_DEADLINE_DAYS} hari kerja (${DEFAULT_WORKING_HOURS}) dengan menyebut ID laporan.`,
+            "Setelah barang diterima admin, laporan tampil di katalog tanpa ciri rahasia Anda.",
+            "Jika ada yang mengklaim, admin mencocokkan bukti dengan ciri rahasia dari Anda, lalu menyerahkan barang ke pemiliknya.",
           ];
 
   return (

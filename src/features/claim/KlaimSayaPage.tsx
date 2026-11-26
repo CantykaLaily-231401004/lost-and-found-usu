@@ -11,7 +11,8 @@ import TextArea from "../../shared/components/TextArea";
 import { useSessionUser } from "../../shared/hooks/useSessionUser";
 import { categoryLabel, type ClaimStatus } from "../../shared/store/lofiStore";
 import { formatDateTime, shorten } from "../../shared/utils/format";
-import type { MyClaim } from "../../services/mappers";
+import { DEFAULT_WORKING_HOURS } from "../../shared/utils/handover";
+import { handoverPointLabel, type MyClaim } from "../../services/mappers";
 import { errorMessage } from "../../services/rpc";
 import {
   cancelClaim,
@@ -48,9 +49,13 @@ export default function KlaimSayaPage() {
     if (!userId) return;
     let active = true;
     listMyClaims(userId)
-      .then((claims) => active && setLoaded({ key: requestKey, claims, error: "" }))
+      .then(
+        (claims) => active && setLoaded({ key: requestKey, claims, error: "" }),
+      )
       .catch(
-        (e) => active && setLoaded({ key: requestKey, claims: [], error: errorMessage(e) }),
+        (e) =>
+          active &&
+          setLoaded({ key: requestKey, claims: [], error: errorMessage(e) }),
       );
     return () => {
       active = false;
@@ -72,7 +77,9 @@ export default function KlaimSayaPage() {
     if (!cancelling || cancelBusy) return;
     const text = reason.trim();
     if (text.length < MIN_CANCEL_REASON)
-      return setReasonError(`Tulis alasan pembatalan (minimal ${MIN_CANCEL_REASON} karakter).`);
+      return setReasonError(
+        `Tulis alasan pembatalan (minimal ${MIN_CANCEL_REASON} karakter).`,
+      );
     setCancelBusy(true);
     try {
       await cancelClaim(cancelling.id, text);
@@ -193,7 +200,8 @@ export default function KlaimSayaPage() {
                     : "Barang tidak tersedia"}
                 </h2>
                 <p className="mt-0.5 text-sm text-gray-500">
-                  {item && `${categoryLabel(item)} · `}Diajukan: {formatDateTime(c.createdAt)}
+                  {item && `${categoryLabel(item)} · `}Diajukan:{" "}
+                  {formatDateTime(c.createdAt)}
                 </p>
                 <div className="mt-3 rounded-lg bg-surface px-3.5 py-2.5">
                   <p className="text-sm font-medium text-gray-900">
@@ -203,23 +211,54 @@ export default function KlaimSayaPage() {
                     {c.evidence}
                   </p>
                 </div>
-                {(c.status === "Ditolak" || c.status === "Dibatalkan") && c.reason && (
-                  <p className="mt-2 text-sm text-gray-600">
-                    <strong>
-                      {c.status === "Ditolak" ? "Alasan penolakan" : "Alasan pembatalan"}:
-                    </strong>{" "}
-                    {c.reason}
-                    {c.decidedAt && (
-                      <span className="text-gray-500"> ({formatDateTime(c.decidedAt)})</span>
-                    )}
-                  </p>
-                )}
+                {(c.status === "Ditolak" || c.status === "Dibatalkan") &&
+                  c.reason && (
+                    <p className="mt-2 text-sm text-gray-600">
+                      <strong>
+                        {c.status === "Ditolak"
+                          ? "Alasan penolakan"
+                          : "Alasan pembatalan"}
+                        :
+                      </strong>{" "}
+                      {c.reason}
+                      {c.decidedAt && (
+                        <span className="text-gray-500">
+                          {" "}
+                          ({formatDateTime(c.decidedAt)})
+                        </span>
+                      )}
+                    </p>
+                  )}
                 {c.status === "Disetujui" && (
-                  <p className="mt-3 rounded-lg border border-brand-700/30 bg-brand-50 px-3.5 py-2.5 text-sm text-brand-950">
-                    Klaim disetujui. Jadwal serah terima akan dibuat oleh admin
-                    dan muncul di menu Jadwal. Klaim yang sudah disetujui tidak
-                    bisa dibatalkan langsung; hubungi admin.
-                  </p>
+                  <div className="mt-3 rounded-lg border border-brand-700/30 bg-brand-50 px-3.5 py-3 text-sm text-brand-950">
+                    <p className="font-medium">
+                      Klaim disetujui. Ambil barang di{" "}
+                      {handoverPointLabel(item?.areaName, item?.areaKind)}.
+                    </p>
+                    {c.pickupCode ? (
+                      <p className="mt-2">
+                        Kode pengambilan:{" "}
+                        <span className="rounded-md bg-white px-2 py-0.5 font-mono text-base font-bold tracking-widest">
+                          {c.pickupCode}
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-brand-800">
+                        Kode pengambilan sedang disiapkan.
+                      </p>
+                    )}
+                    <ul className="mt-2 list-disc space-y-0.5 pl-5">
+                      <li>Bawa KTM dan tunjukkan kode ini kepada admin.</li>
+                      <li>Datang pada jam kerja: {DEFAULT_WORKING_HOURS}.</li>
+                      {c.pickupDeadline && (
+                        <li>
+                          Batas pengambilan: {formatDateTime(c.pickupDeadline)}.
+                          Lewat batas, klaim dibatalkan dan barang kembali
+                          tersedia.
+                        </li>
+                      )}
+                    </ul>
+                  </div>
                 )}
               </article>
             );

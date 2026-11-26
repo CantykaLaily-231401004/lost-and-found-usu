@@ -9,14 +9,13 @@ import DetailLaporanPage from "./features/search/DetailLaporanPage";
 import LaporanSayaPage from "./features/my-reports/LaporanSayaPage";
 import AjukanKlaimPage from "./features/claim/AjukanKlaimPage";
 import KlaimSayaPage from "./features/claim/KlaimSayaPage";
-import JadwalPage from "./features/handover/JadwalPage";
 import NotifikasiPage from "./features/notification/NotifikasiPage";
 import AkunPage from "./features/account/AkunPage";
 import RequireAuth from "./shared/components/RequireAuth";
 import AdminRingkasanPage from "./features/admin/AdminRingkasanPage";
 import AdminTemuanPage from "./features/admin/AdminTemuanPage";
 import AdminKlaimPage from "./features/admin/AdminKlaimPage";
-import AdminJadwalPage from "./features/admin/AdminJadwalPage";
+import AdminPengambilanPage from "./features/admin/AdminPengambilanPage";
 import AdminRiwayatPage from "./features/admin/AdminRiwayatPage";
 import AdminPengelolaanPage from "./features/admin/AdminPengelolaanPage";
 
@@ -35,7 +34,6 @@ export default function App() {
           <Route path="/laporan-saya" element={<LaporanSayaPage />} />
           <Route path="/klaim-saya" element={<KlaimSayaPage />} />
           <Route path="/klaim/baru/:kode" element={<AjukanKlaimPage />} />
-          <Route path="/jadwal" element={<JadwalPage />} />
           <Route path="/notifikasi" element={<NotifikasiPage />} />
           <Route path="/akun" element={<AkunPage />} />
           <Route path="/lapor/kehilangan" element={<LostReportPage />} />
@@ -49,7 +47,7 @@ export default function App() {
           <Route path="/admin" element={<AdminRingkasanPage />} />
           <Route path="/admin/temuan" element={<AdminTemuanPage />} />
           <Route path="/admin/klaim" element={<AdminKlaimPage />} />
-          <Route path="/admin/jadwal" element={<AdminJadwalPage />} />
+          <Route path="/admin/pengambilan" element={<AdminPengambilanPage />} />
           <Route path="/admin/riwayat" element={<AdminRiwayatPage />} />
           <Route path="/admin/pengelolaan" element={<AdminPengelolaanPage />} />
         </Route>

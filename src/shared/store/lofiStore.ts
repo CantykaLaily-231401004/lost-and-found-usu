@@ -1,10 +1,12 @@
 import { useSyncExternalStore } from "react";
 import { OTHER_CATEGORY } from "../utils/reportOptions";
 import { shorten } from "../utils/format";
+import { generatePickupCode, pickupDeadlineFrom } from "../utils/handover";
 
 export type ReportKind = "lost" | "found";
 export type ReportStatus =
   | "Aktif"
+  | "Menunggu"
   | "Tersedia"
   | "Dicadangkan"
   | "Diserahkan"
@@ -15,8 +17,7 @@ export type ClaimStatus =
   | "Ditolak"
   | "Dibatalkan"
   | "Selesai";
-export type ScheduleStatus = "Terjadwal" | "Dibatalkan" | "Selesai";
-export type NotifType = "Klaim" | "Jadwal" | "Laporan" | "Sistem";
+export type NotifType = "Klaim" | "Pengambilan" | "Laporan" | "Sistem";
 
 export type Report = {
   id: string;
@@ -52,20 +53,10 @@ export type Claim = {
   decisionReason?: string;
   decidedAt?: string;
   matchedSecrets?: number[];
-};
-
-export type Schedule = {
-  id: string;
-  ownerId: string;
-  claimId: string;
-  title: string;
-  at: string;
-  place: string;
-  note: string;
-  officer: string;
-  /** Kosong dianggap Terjadwal (data lama). */
-  status?: ScheduleStatus;
-  cancelReason?: string;
+  /** Kode pengambilan, terbit saat klaim disetujui. */
+  pickupCode?: string;
+  /** Batas pemilik mengambil barang. */
+  pickupDeadline?: string;
 };
 
 export type Notif = {
@@ -81,7 +72,6 @@ export type Notif = {
 type State = {
   reports: Report[];
   claims: Claim[];
-  schedules: Schedule[];
   notifications: Notif[];
 };
 
@@ -101,10 +91,10 @@ export type ReportInput = Pick<
   | "photos"
 >;
 
-const KEY = "lofi-dummy-store-v2";
+const KEY = "lofi-dummy-store-v3";
 
 function empty(): State {
-  return { reports: [], claims: [], schedules: [], notifications: [] };
+  return { reports: [], claims: [], notifications: [] };
 }
 
 function load(): State {
@@ -177,7 +167,7 @@ export function addReport(input: ReportInput, ownerId: string): Report {
       state.reports.filter((r) => r.kind === input.kind).map((r) => r.id),
     ),
     ownerId,
-    status: input.kind === "lost" ? "Aktif" : "Tersedia",
+    status: input.kind === "lost" ? "Aktif" : "Menunggu",
     createdAt: new Date().toISOString(),
   };
   const lost = input.kind === "lost";
@@ -188,10 +178,10 @@ export function addReport(input: ReportInput, ownerId: string): Report {
       makeNotif(
         ownerId,
         "Laporan",
-        lost ? "Laporan Kehilangan Aktif" : "Laporan Temuan Tersedia",
+        lost ? "Laporan Kehilangan Aktif" : "Laporan Temuan Diterima",
         lost
           ? `Laporan kehilangan "${shorten(input.description)}" (ID: ${report.id}) telah berhasil dibuat dan sedang aktif.`
-          : `Laporan temuan "${shorten(input.description)}" (ID: ${report.id}) telah terbit di katalog tanpa ciri rahasia Anda.`,
+          : `Laporan temuan "${shorten(input.description)}" (ID: ${report.id}) tercatat. Serahkan barang ke admin fakultas pada jam kerja dengan menyebut ID laporan. Laporan tampil di katalog setelah barang diterima admin.`,
       ),
       ...state.notifications,
     ],
@@ -327,16 +317,6 @@ export function hasActiveClaim(s: State, reportId: string) {
   );
 }
 
-/** Status efektif jadwal; data lama tanpa status dianggap Terjadwal. */
-export function scheduleStatus(sc: Schedule): ScheduleStatus {
-  return sc.status ?? "Terjadwal";
-}
-
-/** Semua jadwal milik user, termasuk riwayat (Selesai/Dibatalkan) sesuai SRS DR-01. */
-export function schedulesOf(s: State, ownerId: string) {
-  return s.schedules.filter((sc) => sc.ownerId === ownerId);
-}
-
 /* ---------- tindakan admin (dummy) ---------- */
 
 /** Setujui klaim: wajib menandai minimal satu ciri rahasia yang cocok. */
@@ -344,6 +324,8 @@ export function approveClaim(id: string, matched: number[]) {
   const claim = state.claims.find((c) => c.id === id);
   if (!claim || claim.status !== "Menunggu" || matched.length < 1) return false;
   const report = state.reports.find((r) => r.id === claim.reportId);
+  const code = generatePickupCode();
+  const deadline = pickupDeadlineFrom();
   commit({
     ...state,
     claims: state.claims.map((c) =>
@@ -353,6 +335,8 @@ export function approveClaim(id: string, matched: number[]) {
             status: "Disetujui",
             matchedSecrets: matched,
             decidedAt: new Date().toISOString(),
+            pickupCode: code,
+            pickupDeadline: deadline,
           }
         : c,
     ),
@@ -364,7 +348,7 @@ export function approveClaim(id: string, matched: number[]) {
         claim.ownerId,
         "Klaim",
         "Klaim Disetujui",
-        `Klaim ${id} untuk "${shorten(report?.description ?? claim.reportId)}" disetujui. Admin akan menetapkan jadwal serah terima.`,
+        `Klaim ${id} untuk "${shorten(report?.description ?? claim.reportId)}" disetujui. Datang ke admin fakultas pada jam kerja dengan membawa KTM dan kode pengambilan ${code}, paling lambat ${new Date(deadline).toLocaleDateString("id-ID", { dateStyle: "long" })}.`,
       ),
       ...state.notifications,
     ],
@@ -401,49 +385,22 @@ export function rejectClaim(id: string, reason: string) {
   return true;
 }
 
-/** Buat jadwal serah terima. Mengembalikan pesan error, atau null jika berhasil. */
-export function createSchedule(
-  claimId: string,
-  input: { at: string; place: string; officer: string; note: string },
-): string | null {
-  const claim = state.claims.find((c) => c.id === claimId);
-  if (!claim || claim.status !== "Disetujui") return "Klaim belum disetujui.";
-  if (
-    state.schedules.some(
-      (s) => s.claimId === claimId && scheduleStatus(s) === "Terjadwal",
-    )
-  )
-    return "Klaim ini sudah punya jadwal aktif.";
-  const at = new Date(input.at);
-  if (Number.isNaN(at.getTime())) return "Waktu tidak valid.";
-  if (at.getTime() <= Date.now())
-    return "Waktu serah terima harus di masa depan.";
-  if (input.place.trim().length < 3) return "Isi tempat serah terima.";
-  if (input.officer.trim().length < 3) return "Isi nama penanggung jawab.";
-  const report = state.reports.find((r) => r.id === claim.reportId);
-  const schedule: Schedule = {
-    id: nextId(
-      "JDW",
-      state.schedules.map((s) => s.id),
-    ),
-    ownerId: claim.ownerId,
-    claimId,
-    title: shorten(report?.description ?? claim.reportId, 60),
-    at: at.toISOString(),
-    place: input.place.trim(),
-    note: input.note.trim(),
-    officer: input.officer.trim(),
-    status: "Terjadwal",
-  };
+/** Admin menerima barang dari penemu: laporan menjadi Tersedia dan tampil di katalog. */
+export function receiveItem(reportId: string): string | null {
+  const report = state.reports.find((r) => r.id === reportId);
+  if (!report || report.kind !== "found") return "Laporan temuan tidak ditemukan.";
+  if (report.status !== "Menunggu") return "Barang ini tidak sedang menunggu penyerahan.";
   commit({
     ...state,
-    schedules: [schedule, ...state.schedules],
+    reports: state.reports.map((r) =>
+      r.id === reportId ? { ...r, status: "Tersedia" } : r,
+    ),
     notifications: [
       makeNotif(
-        claim.ownerId,
-        "Jadwal",
-        "Jadwal Serah Terima Dibuat",
-        `Serah terima "${schedule.title}" dijadwalkan di ${schedule.place}. Cek menu Jadwal untuk detailnya.`,
+        report.ownerId,
+        "Laporan",
+        "Barang Diterima Admin",
+        `Barang pada laporan ${report.id} sudah diterima admin dan kini tampil di katalog. Terima kasih sudah membantu.`,
       ),
       ...state.notifications,
     ],
@@ -451,59 +408,32 @@ export function createSchedule(
   return null;
 }
 
-/** Batalkan jadwal (wajib alasan). Klaim tetap Disetujui, temuan tetap Dicadangkan. */
-export function cancelSchedule(id: string, reason: string) {
-  const sc = state.schedules.find((s) => s.id === id);
-  if (!sc || scheduleStatus(sc) !== "Terjadwal" || reason.trim().length < 3)
-    return false;
+/** Selesaikan pengambilan: kode harus cocok dan KTM sudah diperiksa admin. */
+export function completePickup(
+  claimId: string,
+  code: string,
+  ktmChecked: boolean,
+): string | null {
+  const claim = state.claims.find((c) => c.id === claimId);
+  if (!claim || claim.status !== "Disetujui") return "Klaim tidak siap diambil.";
+  if (!ktmChecked) return "Centang bahwa KTM sudah diperiksa dan sesuai dengan akun pemilik.";
+  if (code.trim().toUpperCase() !== (claim.pickupCode ?? ""))
+    return "Kode pengambilan tidak cocok.";
+  const report = state.reports.find((r) => r.id === claim.reportId);
   commit({
     ...state,
-    schedules: state.schedules.map((s) =>
-      s.id === id
-        ? { ...s, status: "Dibatalkan", cancelReason: reason.trim() }
-        : s,
-    ),
-    notifications: [
-      makeNotif(
-        sc.ownerId,
-        "Jadwal",
-        "Jadwal Dibatalkan",
-        `Jadwal ${id} dibatalkan. Alasan: ${reason.trim()}. Admin akan menetapkan jadwal pengganti.`,
-      ),
-      ...state.notifications,
-    ],
-  });
-  return true;
-}
-
-/** Selesaikan serah terima: perlu konfirmasi pemilik DAN penyerah. */
-export function completeHandover(
-  scheduleId: string,
-  ownerConfirmed: boolean,
-  giverConfirmed: boolean,
-) {
-  if (!ownerConfirmed || !giverConfirmed) return false;
-  const sc = state.schedules.find((s) => s.id === scheduleId);
-  if (!sc || scheduleStatus(sc) !== "Terjadwal") return false;
-  const claim = state.claims.find((c) => c.id === sc.claimId);
-  const report = claim && state.reports.find((r) => r.id === claim.reportId);
-  commit({
-    ...state,
-    schedules: state.schedules.map((s) =>
-      s.id === scheduleId ? { ...s, status: "Selesai" } : s,
-    ),
     claims: state.claims.map((c) =>
-      c.id === sc.claimId ? { ...c, status: "Selesai" } : c,
+      c.id === claimId ? { ...c, status: "Selesai" } : c,
     ),
     reports: state.reports.map((r) =>
-      claim && r.id === claim.reportId ? { ...r, status: "Diserahkan" } : r,
+      r.id === claim.reportId ? { ...r, status: "Diserahkan" } : r,
     ),
     notifications: [
       makeNotif(
-        sc.ownerId,
-        "Jadwal",
-        "Serah Terima Selesai",
-        `Serah terima "${sc.title}" telah selesai. Terima kasih.`,
+        claim.ownerId,
+        "Pengambilan",
+        "Barang Telah Diambil",
+        `Pengambilan "${shorten(report?.description ?? claim.reportId)}" selesai. Terima kasih.`,
       ),
       ...(report
         ? [
@@ -515,6 +445,33 @@ export function completeHandover(
             ),
           ]
         : []),
+      ...state.notifications,
+    ],
+  });
+  return null;
+}
+
+/** Batas ambil terlewat: klaim dibatalkan dan barang kembali Tersedia. */
+export function expireClaim(claimId: string): boolean {
+  const claim = state.claims.find((c) => c.id === claimId);
+  if (!claim || claim.status !== "Disetujui") return false;
+  commit({
+    ...state,
+    claims: state.claims.map((c) =>
+      c.id === claimId
+        ? { ...c, status: "Dibatalkan", decisionReason: "Batas pengambilan terlewat." }
+        : c,
+    ),
+    reports: state.reports.map((r) =>
+      r.id === claim.reportId ? { ...r, status: "Tersedia" } : r,
+    ),
+    notifications: [
+      makeNotif(
+        claim.ownerId,
+        "Klaim",
+        "Klaim Dibatalkan",
+        `Klaim ${claimId} dibatalkan karena batas pengambilan terlewat. Barang kembali tersedia di katalog.`,
+      ),
       ...state.notifications,
     ],
   });
