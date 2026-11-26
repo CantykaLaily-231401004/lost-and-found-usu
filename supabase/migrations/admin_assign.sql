@@ -177,6 +177,73 @@ begin
 end;
 $$;
 
+create or replace function public.rpc_admin_dashboard()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path to ''
+as $$
+declare
+  v_guard jsonb := public.internal_admin_guard();
+  v_areas uuid[];
+begin
+  if v_guard is not null then
+    return v_guard;
+  end if;
+  v_areas := public.internal_admin_areas();
+
+  return jsonb_build_object('ok', true, 'data', jsonb_build_object(
+    'temuan_menunggu', (select count(*) from public.found_reports f
+                        where f.area_id = any (v_areas) and f.status = 'menunggu'),
+    'klaim_disetujui', (select count(*) from public.claims c
+                        join public.found_reports f on f.found_id = c.found_id
+                        where f.area_id = any (v_areas) and c.status = 'disetujui'),
+    'temuan_tersedia', (select count(*) from public.found_reports f
+                        where f.area_id = any (v_areas) and f.status = 'tersedia'),
+    'temuan_total',    (select count(*) from public.found_reports f
+                        where f.area_id = any (v_areas)),
+    'kehilangan_aktif', (select count(*) from public.lost_reports l
+                         where l.area_id = any (v_areas) and l.status = 'aktif'),
+    'klaim_menunggu',  (select count(*) from public.claims c
+                        join public.found_reports f on f.found_id = c.found_id
+                        where f.area_id = any (v_areas) and c.status = 'menunggu'),
+    'jadwal_diajukan', (select count(*) from public.handover_schedules s
+                        join public.claims c on c.claim_id = s.claim_id
+                        join public.found_reports f on f.found_id = c.found_id
+                        where f.area_id = any (v_areas) and s.status = 'diajukan'),
+    'jadwal_aktif',    (select count(*) from public.handover_schedules s
+                        join public.claims c on c.claim_id = s.claim_id
+                        join public.found_reports f on f.found_id = c.found_id
+                        where f.area_id = any (v_areas) and s.status in ('diajukan', 'terjadwal')),
+    'per_area', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'area_id', a.area_id,
+               'nama_area', a.nama_area,
+               'jenis_area', a.jenis_area,
+               'temuan_menunggu',   (select count(*) from public.found_reports f
+                                     where f.area_id = a.area_id and f.status = 'menunggu'),
+               'temuan_tersedia',   (select count(*) from public.found_reports f
+                                     where f.area_id = a.area_id and f.status = 'tersedia'),
+               'temuan_dicadangkan', (select count(*) from public.found_reports f
+                                     where f.area_id = a.area_id and f.status = 'dicadangkan'),
+               'temuan_diserahkan', (select count(*) from public.found_reports f
+                                     where f.area_id = a.area_id and f.status = 'diserahkan'),
+               'klaim_menunggu',    (select count(*) from public.claims c
+                                     join public.found_reports f on f.found_id = c.found_id
+                                     where f.area_id = a.area_id and c.status = 'menunggu'),
+               'admin_aktif',       (select count(*) from public.penugasan_admin pa
+                                     where pa.area_id = a.area_id and pa.status = 'aktif'))
+             order by a.jenis_area, a.nama_area)
+      from public.areas a
+      where a.area_id = any (v_areas)
+    ), '[]'::jsonb)
+  ));
+end;
+$$;
+
+revoke all on function public.rpc_admin_dashboard() from public, anon, authenticated;
+grant execute on function public.rpc_admin_dashboard() to authenticated;
 revoke all on function public.rpc_admin_list_accounts() from public, anon, authenticated;
 grant execute on function public.rpc_admin_list_accounts() to authenticated;
 revoke all on function public.rpc_admin_assign_faculty(text, uuid) from public, anon, authenticated;
