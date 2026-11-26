@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Logo } from "../shared/components/AuthLayout";
 
-// Isi nanti: import campus from "../assets/campus.jpg"  lalu  const PHOTO_SRC = campus
-const PHOTO_SRC = undefined as string | undefined;
+import campus from "../assets/campus.webp";
+
+const PHOTO_SRC = campus;
 
 const steps = [
   {
