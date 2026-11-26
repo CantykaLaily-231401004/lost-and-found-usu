@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 
-// Isi nanti: import logo from "../../assets/logo.png"  lalu  const LOGO_SRC = logo
-const LOGO_SRC = undefined as string | undefined;
-// Isi nanti: import campus from "../../assets/campus.jpg"  lalu  const PHOTO_SRC = campus
-const PHOTO_SRC = undefined as string | undefined;
+import logo from "../../assets/lofi-icon.svg";
+const LOGO_SRC = logo;
+
+import campus from "../../assets/campus.webp";
+const PHOTO_SRC = campus;
 
 const steps = [
   "Laporkan barang hilang atau temuan",

@@ -5,6 +5,7 @@ import { useSessionUser } from "../hooks/useSessionUser";
 import { useIsAdmin } from "../hooks/useIsAdmin";
 import { useLofiStore } from "../store/lofiStore";
 import { supabase } from "../../services/supabase";
+import logo from "../../assets/lofi-icon.svg";
 
 const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: "/cari", label: "Cari Barang", icon: "search" },
@@ -71,9 +72,7 @@ export default function AppShell({
       <header className="shrink-0 px-4 pt-3 text-white sm:px-6">
         <div className="flex h-12 items-center justify-between gap-3">
           <Link to={user ? "/cari" : "/"} className="flex items-center gap-2.5">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-tag text-brand-950">
-              <Icon name="search" className="size-4" />
-            </span>
+            <img src={logo} alt="" className="size-8 rounded-lg" />
             <span className="leading-tight">
               <span className="block font-display text-base font-bold">
                 LoFi USU
